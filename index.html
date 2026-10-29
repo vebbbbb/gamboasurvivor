@@ -22,7 +22,7 @@ button:hover{background:#fff27a}
 .card:hover{transform:translateY(-6px) rotate(-1deg);background:#37496a}
 .card .ic{font-size:46px}.card .nm{font-weight:bold;font-size:20px;margin:4px 0;color:#ffe14d}
 .card .lv{font-size:14px;color:#7ee081;font-weight:bold}.card .ds{font-size:14px;margin-top:8px;opacity:.92}
-.card .key{position:absolute;top:6px;left:10px;opacity:.6;font-size:14px}
+.card.evo{border-color:#ff8a3c;box-shadow:0 0 22px #ff8a3c,4px 4px 0 #000;background:#4a2f2a}.syn{font-size:12px;color:#9ad7ff;margin-top:8px}.card.evo{border-color:#ff8a3c;box-shadow:0 0 22px #ff8a3c,4px 4px 0 #000;background:#4a2f2a}.syn{font-size:12px;color:#9ad7ff;margin-top:8px}.card .key{position:absolute;top:6px;left:10px;opacity:.6;font-size:14px}
 #mute{position:fixed;right:12px;bottom:12px;z-index:9;font-size:22px;padding:4px 12px}
 #review{font-size:clamp(16px,2.4vw,24px);max-width:640px;margin:10px 0 16px;font-style:italic;color:#ffe14d}
 #stats{font-size:22px;line-height:1.5}
@@ -36,12 +36,12 @@ button:hover{background:#fff27a}
   <div id="face" class="face">🙂</div>
   <h1 id="nameTitle">[NAME]</h1>
   <div class="blink">PRESS SPACE TO SURVIVE THE WORKDAY</div>
-  <div class="hint">WASD / Arrows to move. SPACE = jump, then Z = kickflip, X = 360 in the air (land tricks for a shockwave). Ride up ramps to launch, land on rails to grind. Chain tricks, grinds and launches for a STYLE multiplier: more damage and speed until you stop. Attacks are automatic. Collect coffee beans, grab White Monsters for a rush, and avoid the Steering Committee. M = mute, P = pause.</div>
+  <div class="hint">WASD / Arrows to move. Hold a direction to kick off and roll (kick again if you slow down). SPACE = jump; in the air Z = kickflip, X = 360, Z+X together = BACKFLIP. Land tricks for a shockwave. Halfpipes and ramps launch you. Ride up ramps to launch, land on rails to grind. Chain tricks, grinds and launches for a STYLE multiplier: more damage and speed until you stop. Attacks are automatic. Collect coffee beans, grab White Monsters for a rush, and beat a boss every 2 minutes to unlock synergy evolutions. M = mute, P = pause.</div>
   <input id="nameIn" maxlength="16" placeholder="Type your name…" autocomplete="off" spellcheck="false">
   <div class="hint">Type a name, then press Enter to start.</div>
 </div>
 <div id="levelup" class="overlay">
-  <h1>LEVEL UP! 🎉</h1>
+  <h1 id="luTitle">LEVEL UP! 🎉</h1>
   <div>Pick an upgrade (click or press 1 / 2 / 3)</div>
   <div id="cards"></div>
 </div>
@@ -121,6 +121,7 @@ const S={
   },
   nuke:()=>{tone(110,.7,'sawtooth',.2,-80);tone(70,.8,'square',.15,-40,.05);S.monster();},
   jump:()=>tone(260,.15,'sine',.1,500),
+  push:()=>sfx('push',120,()=>tone(170,.06,'triangle',.07,-60)),
   trick:()=>{tone(700,.06,'square',.06);tone(1000,.08,'square',.06,0,.06);},
   land:()=>tone(90,.12,'triangle',.15,-40),
   grindTick:()=>sfx('grind',70,()=>tone(1800+Math.random()*600,.05,'sawtooth',.025)),
@@ -294,13 +295,31 @@ HEAD={c:playerSpr,w:60,h:60};
 const ETYPES=[
   {id:'ticket',emoji:'🎫',size:24,hp:4,spd:72,dmg:4,xp:1,minT:0,w:6,wob:1,col:['#ffe66b','#9ad7ff','#fff'],quip:['PROJ-4812','Reopened','Needs refinement','P0!!']},
   {id:'deadline',emoji:'⏰',size:26,hp:6,spd:100,dmg:5,xp:1,minT:0,w:4,wob:1.5,col:['#fff','#ff6b6b','#ffe66b'],quip:['DUE YESTERDAY','ASAP!!!','EOD!','!!!']},
-  {id:'gantt',emoji:'📊',size:28,hp:12,spd:88,dmg:6,xp:2,minT:35,w:3,wob:2,col:['#7ec8ff','#7ee081','#fff'],quip:['Critical path!','Slipped 3 weeks','Baseline updated']},
-  {id:'creep',emoji:'🐍',size:26,hp:9,spd:140,dmg:5,xp:2,minT:60,w:2.5,wob:3,zig:true,col:['#7ee081','#2e8b3d','#fff'],quip:['Just one more feature','Small change...','Scope creep!']},
-  {id:'standup',emoji:'👥',size:40,hp:55,spd:46,dmg:9,xp:5,minT:90,w:1.5,wob:.6,col:['#ffd1a0','#8fb4ff','#fff'],quip:['Quick sync?','Any blockers?','Yesterday I...']},
-  {id:'budget',emoji:'💸',size:36,hp:70,spd:62,dmg:10,xp:6,minT:150,w:1,wob:1.5,col:['#7ee081','#fff','#ffe66b'],quip:['Over budget!','No budget.','Cost overrun']},
-  {id:'clipboard',emoji:'📋',size:40,hp:85,spd:38,dmg:12,xp:7,minT:130,w:1,wob:.4,col:['#ddd','#c98a55','#fff'],quip:['TPS REPORT?!','Status update?']},
+  {id:'gantt',emoji:'📊',size:28,hp:12,spd:88,dmg:6,xp:2,minT:20,w:3,wob:2,col:['#7ec8ff','#7ee081','#fff'],quip:['Critical path!','Slipped 3 weeks','Baseline updated']},
+  {id:'creep',emoji:'🐍',size:26,hp:9,spd:140,dmg:5,xp:2,minT:40,w:2.5,wob:3,zig:true,col:['#7ee081','#2e8b3d','#fff'],quip:['Just one more feature','Small change...','Scope creep!']},
+  {id:'standup',emoji:'👥',size:40,hp:55,spd:46,dmg:9,xp:5,minT:60,w:1.5,wob:.6,col:['#ffd1a0','#8fb4ff','#fff'],quip:['Quick sync?','Any blockers?','Yesterday I...']},
+  {id:'budget',emoji:'💸',size:36,hp:70,spd:62,dmg:10,xp:6,minT:110,w:1,wob:1.5,col:['#7ee081','#fff','#ffe66b'],quip:['Over budget!','No budget.','Cost overrun']},
+  {id:'clipboard',emoji:'📋',size:40,hp:85,spd:38,dmg:12,xp:7,minT:90,w:1,wob:.4,col:['#ddd','#c98a55','#fff'],quip:['TPS REPORT?!','Status update?']},
 ];
-const BOSS_TYPE={id:'boss',emoji:'🗓️',size:150,hp:1500,spd:52,dmg:18,xp:4,wob:.15,col:['#fff','#ff6b6b','#ffe66b']};
+// A boss every 2 minutes, cycling through these (later cycles are tougher).
+const BOSSES=[
+  {name:'THE TEAM LEAD',emoji:'👔',size:130,hp:1400,spd:70,dmg:16,charge:1,summon:5,minions:['ticket','deadline'],line:"Let's circle back on your performance!",col:['#fff','#7ec8ff','#ffe66b']},
+  {name:'THE PROJECT MANAGER',emoji:'📈',size:130,hp:1800,spd:55,dmg:16,ring:3.2,summon:3,minions:['gantt','deadline','ticket'],line:'Scope change: you are descoped.',col:['#7ee081','#fff','#ffe66b']},
+  {name:'THE OFFICE WEIRDO',emoji:'🤡',size:130,hp:2100,spd:90,dmg:14,blink:3.2,summon:4,minions:['creep','ticket'],line:'...he left a sandwich in the fridge since 2019.',col:['#ff6b6b','#fff','#b9a0ff']},
+  {name:'THE STEERING COMMITTEE',emoji:'🗓️',size:150,hp:2800,spd:52,dmg:18,ring:4,summon:3,minions:['ticket','deadline','standup'],line:'THIS COULD HAVE BEEN AN EMAIL',col:['#fff','#ff6b6b','#ffe66b']},
+  {name:'HR "BUSINESS PARTNER"',emoji:'🧐',size:130,hp:3300,spd:62,dmg:18,ring:2.6,charge:1,summon:4,minions:['clipboard','standup'],line:'This conversation never happened.',col:['#fff','#c98a55','#ddd']},
+  {name:'THE CEO',emoji:'🤑',size:160,hp:4600,spd:80,dmg:24,charge:1,ring:3,blink:6,summon:2,minions:['budget','standup','gantt'],line:'Synergy achieved. You are all fired.',col:['#ffe14d','#7ee081','#fff']},
+];
+for(const b of BOSSES)Object.assign(b,{id:'boss',xp:4,wob:.15});
+const etype=id=>ETYPES.find(t=>t.id===id);
+// Synergy evolutions: weapon at Lv5 + partner upgrade at Lv3, offered as a reward after a boss falls.
+const EVOS=[
+  {id:'coffee',needs:'atk',name:'Espresso Gatling',icon:'☕',desc:'Coffee + Energy Drink: five scalding cups per volley, fired almost nonstop, with huge splash.'},
+  {id:'keyboard',needs:'dmg',name:'Mechanical Mayhem',icon:'⌨️',desc:'Keyboards + Passive Aggression: two staggered rings of angry keyboards hitting twice as hard.'},
+  {id:'nova',needs:'pickup',name:'Mass Mailing',icon:'📧',desc:'Reply-All + Lanyard Magnet: giant rapid blasts that also yank every bean on screen to you.'},
+  {id:'stapler',needs:'speed',name:'Staple Gatling',icon:'📎',desc:'Stapler + Sneakers: a relentless piercing wall of staples.'},
+  {id:'undo',needs:'coffee',name:'Ctrl+Alt+Del',icon:'🔄',desc:'Ctrl+Z + Coffee: frequent big heals, a burst of invulnerability, and a blast that rebooted every nearby enemy.'},
+];
 const DROPS=[['monster',.012],['nuke',.004],['speed',.007],['atk',.007],['magnet',.008],['pizza',.008]];
 const PW={nuke:['🚨','#ff5a3c'],speed:['🚀','#4fc3ff'],atk:['🔥','#ffb02e'],magnet:['🧲','#c77dff']};
 const KILL_QUIPS=['Descoped','Moved to next sprint',"Won't fix",'Closed as duplicate','Resolved','LGTM','Blocker removed','Actioned'];
@@ -362,20 +381,20 @@ const REVIEWS=[
 ];
 
 // ---------- State ----------
-let state='start',paused=false,P,G,enemies,gems,projs,pops,parts,novas,choices=[];
+let state='start',paused=false,P,G,enemies,gems,projs,pops,parts,novas,hrings=[],choices=[];
 const keys={};
 function reset(){
-  P={x:0,y:0,hp:100,max:100,r:24,inv:0,spin:0,walk:0,idle:0,kb:[],kbAng:0,buff:0,tSpeed:0,tAtk:0,face:1,z:0,vz:0,trick:null,tricksDone:0,grind:null,chain:0,chainT:0,onRamp:null,rt:0,ex:0,ey:0,ix:0,iy:0,
+  P={x:0,y:0,hp:100,max:100,r:24,inv:0,spin:0,walk:0,idle:0,kb:[],kbAng:0,buff:0,tSpeed:0,tAtk:0,face:1,z:0,vz:0,trick:null,tricksDone:0,grind:null,chain:0,chainT:0,onRamp:null,rt:0,evo:{},vx:0,vy:0,pushT:0,kick:0,evo:{},vx:0,vy:0,pushT:0,kick:0,ex:0,ey:0,ix:0,iy:0,
     lv:{coffee:1,keyboard:0,nova:0,stapler:0,undo:0,speed:0,pickup:0,dmg:0,atk:0},
     cd:{coffee:.3,nova:2,stapler:1,undo:8}};
-  enemies=[];gems=[];projs=[];pops=[];parts=[];novas=[];
-  G={time:0,kills:0,level:1,xp:0,nextBoss:180,boss:null,spawnAcc:0,swarmT:40,shake:0,flash:0,banner:null,t:0,idc:1,deadT:0,overShown:false};
+  enemies=[];gems=[];projs=[];pops=[];parts=[];novas=[];hrings=[];
+  G={time:0,kills:0,level:1,xp:0,nextBoss:120,boss:null,spawnAcc:0,swarmT:40,shake:0,flash:0,banner:null,t:0,idc:1,deadT:0,overShown:false};
 }
 reset();
 const chainDmg=()=>1+Math.min(1.5,.15*P.chain),chainSpd=()=>1+Math.min(.5,.05*P.chain);
 const dmgM=()=>(1+.2*P.lv.dmg)*chainDmg(),atkM=()=>(1+.15*P.lv.atk)*Math.max(P.buff>0?1.5:1,P.tAtk>0?2.5:1)*(1+Math.min(.4,.04*P.chain));
 const spdBuff=()=>Math.max(P.buff>0?1.5:1,P.tSpeed>0?2.3:1)*chainSpd();
-const xpNeed=()=>Math.floor(5+G.level*3+G.level*G.level*.35);
+const xpNeed=()=>Math.floor(4+G.level*2.2+G.level*G.level*.22);
 
 // ---------- Spatial grid (separation) ----------
 const GC=44,GW=96,GH=96,gHead=new Int32Array(GW*GH),gNext=new Int32Array(4096);
@@ -402,9 +421,9 @@ function banner(t,col){G.banner={txt:t,t:2.2,col:col||'#ffe14d'};}
 // ---------- Enemies ----------
 function spawnEnemy(type,x,y,boss){
   if(enemies.length>=900)return null;
-  const hpM=boss?1:1+G.time/90*.25;
-  const e={id:G.idc++,t:type,x,y,hp:type.hp*hpM,maxhp:type.hp*hpM,r:type.size*(boss?.42:.45),spd:type.spd*rnd(.9,1.1),dmg:type.dmg,
-    xp:type.xp,flash:0,kx:0,ky:0,ph:rnd(0,TAU),kbT:0,novaId:0,quipT:0,dead:false,boss:!!boss,cell:-1,tg:0,minionT:3,sp:sprite(type.emoji,type.size)};
+  const hpM=boss?1:1+G.time/60*.3;
+  const e={id:G.idc++,t:type,x,y,hp:type.hp*hpM,maxhp:type.hp*hpM,r:type.size*(boss?.42:.45),spd:type.spd*rnd(.9,1.1),dmg:type.dmg*(boss?1:1+G.time/300),
+    xp:type.xp,flash:0,kx:0,ky:0,ph:rnd(0,TAU),kbT:0,novaId:0,quipT:0,dead:false,boss:!!boss,cell:-1,tg:0,dvx:0,dvy:0,dashT:0,sp:sprite(type.emoji,type.size)};
   enemies.push(e);return e;
 }
 // A point just off-screen (in screen space), converted back to the ground plane.
@@ -421,23 +440,49 @@ function pickType(){
 }
 const SWARM_TEXT=['SPRINT PLANNING!','SCOPE CHANGE!','"QUICK SYNC?"','REORG!','CODE FREEZE VIOLATION!'];
 function spawning(dt){
-  const target=Math.min(650,12+G.time+Math.pow(G.time/60,2)*3);
+  const target=Math.min(850,20+G.time*1.6+Math.pow(G.time/50,2)*5);
   if(enemies.length<target){
-    G.spawnAcc+=dt*(5+G.time*.12);
+    G.spawnAcc+=dt*(8+G.time*.2);
     while(G.spawnAcc>=1){G.spawnAcc--;const[x,y]=ringPos();spawnEnemy(pickType(),x,y);}
   }else G.spawnAcc=0;
   G.swarmT-=dt;
   if(G.swarmT<=0){
-    G.swarmT=35;banner(pick(SWARM_TEXT),'#ff8a8a');S.honk();
-    const n=18+(G.time/10|0),t=pickType();
+    G.swarmT=25;banner(pick(SWARM_TEXT),'#ff8a8a');S.honk();
+    const n=24+(G.time/8|0),t=pickType();
     for(let i=0;i<n;i++){const[x,y]=ringPos(i/n*TAU);spawnEnemy(t,x,y);}
   }
   if(G.time>=G.nextBoss){
-    const n=Math.round(G.nextBoss/180),[x,y]=ringPos();
-    const bt=Object.assign({},BOSS_TYPE,{hp:1500+1200*(n-1)});
+    const n=Math.round(G.nextBoss/120)-1,def=BOSSES[n%BOSSES.length],[x,y]=ringPos();
+    const bt=Object.assign({},def,{hp:def.hp*(1+.7*Math.floor(n/BOSSES.length))*(1+.2*n)});
     const b=spawnEnemy(bt,x,y,true);
-    if(b){G.boss=b;b.maxhp=b.hp=bt.hp;banner('⚠ THE STEERING COMMITTEE ⚠','#ff5050');S.honk();setTimeout(S.honk,350);shake(10);}
-    G.nextBoss+=180;
+    if(b){G.boss=b;b.maxhp=b.hp=bt.hp;banner('⚠ '+def.name+' ⚠','#ff5050');S.honk();setTimeout(S.honk,350);shake(10);}
+    G.nextBoss+=120;
+  }
+}
+function bossAI(e,dt,dx,dy,d){
+  const b=e.t;
+  if(b.charge){
+    if(e.dashT>0){e.dashT-=dt;if(e.dashT<=0){e.dvx=e.dvy=0;}}
+    else if(e.wind>0){
+      e.wind-=dt;e.flash=.05;
+      if(e.wind<=0){e.chT=4;e.dashT=.55;e.dvx=e.ax*640;e.dvy=e.ay*640;S.honk();shake(6);}
+    }else{
+      e.chT=(e.chT===undefined?3:e.chT)-dt;
+      if(e.chT<=0){e.wind=.7;e.ax=dx/d;e.ay=dy/d;popL(e.x,e.y,120,'!!!','#ff5050',34);}
+    }
+  }
+  if(b.ring){e.rgT=(e.rgT===undefined?2.5:e.rgT)-dt;if(e.rgT<=0){e.rgT=b.ring;hrings.push({x:e.x,y:e.y,r:20,maxR:420,hit:false});S.nova();}}
+  if(b.summon){
+    e.smT=(e.smT===undefined?2:e.smT)-dt;
+    if(e.smT<=0){e.smT=b.summon;for(let k=0;k<5;k++)spawnEnemy(etype(b.minions[k%b.minions.length]),e.x+rnd(-80,80),e.y+rnd(-80,80));}
+  }
+  if(b.blink){
+    e.blT=(e.blT===undefined?3:e.blT)-dt;
+    if(e.blT<=0){
+      e.blT=b.blink;burst(e.x,e.y,20,b.col,300,7);
+      const a=Math.random()*TAU;e.x=P.x+Math.cos(a)*260;e.y=P.y+Math.sin(a)*260;
+      burst(e.x,e.y,20,b.col,300,7);popL(e.x,e.y,120,'HEY!','#fff',26);
+    }
   }
 }
 function hurtEnemy(e,dmg,kx,ky,crit0){
@@ -458,9 +503,9 @@ function killEnemy(e,nuke){
   if(e.boss){
     for(let i=0;i<24;i++)gems.push({x:e.x+rnd(-90,90),y:e.y+rnd(-90,90),v:4,mag:false,k:'bean'});
     gems.push({x:e.x,y:e.y,v:0,mag:false,k:'monster'});
-    popL(e.x,e.y,100,'THIS COULD HAVE BEEN AN EMAIL','#7ee081',28);
-    banner('MEETING ADJOURNED','#7ee081');S.honk();shake(14);
-    P.hp=Math.min(P.max,P.hp+25);G.boss=null;
+    popL(e.x,e.y,100,e.t.line||'THIS COULD HAVE BEEN AN EMAIL','#7ee081',24);
+    banner(e.t.name+' DEFEATED!','#7ee081');S.honk();shake(14);
+    P.hp=Math.min(P.max,P.hp+25);G.boss=null;G.evoPending=true;
   }else if(nuke){
     G.xp+=e.xp;
   }else{
@@ -497,42 +542,44 @@ function nearestTargets(k,range){
   return out;
 }
 function fireCoffee(){
-  const lv=P.lv.coffee,cnt=[1,2,2,3,3][lv-1];
+  const lv=P.lv.coffee,ev=P.evo.coffee,cnt=ev?5:[1,2,2,3,3][lv-1];
   const ts=nearestTargets(cnt,650);
   if(!ts.length){P.cd.coffee=.1;return false;}
   for(let i=0;i<cnt;i++){
     const t=ts[i%ts.length],a=Math.atan2(t.y-P.y,t.x-P.x)+(i>=ts.length?rnd(-.25,.25):0);
-    projs.push({k:'coffee',x:P.x,y:P.y,vx:Math.cos(a)*400,vy:Math.sin(a)*400,life:1.3,dmg:(10+4*(lv-1))*dmgM(),r:11,ang:0,splash:48+8*lv,hits:null,pierce:0});
+    projs.push({k:'coffee',x:P.x,y:P.y,vx:Math.cos(a)*400,vy:Math.sin(a)*400,life:1.3,dmg:(10+4*(lv-1))*dmgM()*(ev?1.5:1),r:11,ang:0,splash:(48+8*lv)*(ev?1.6:1),hits:null,pierce:0});
   }
   S.shoot();return true;
 }
 function fireStapler(){
-  const lv=P.lv.stapler,cnt=lv+2,ts=nearestTargets(1,500);
+  const lv=P.lv.stapler,ev=P.evo.stapler,cnt=ev?7:lv+2,ts=nearestTargets(1,500);
   if(!ts.length){P.cd.stapler=.1;return false;}
   const base=Math.atan2(ts[0].y-P.y,ts[0].x-P.x);
   for(let i=0;i<cnt;i++){
-    const a=base+(i-(cnt-1)/2)*.17;
-    projs.push({k:'staple',x:P.x,y:P.y,vx:Math.cos(a)*650,vy:Math.sin(a)*650,life:.42,dmg:(7+2*lv)*dmgM(),r:7,ang:a,hits:[],pierce:lv>=4?1:0});
+    const a=base+(i-(cnt-1)/2)*(ev?.2:.17);
+    projs.push({k:'staple',x:P.x,y:P.y,vx:Math.cos(a)*650,vy:Math.sin(a)*650,life:.42,dmg:(7+2*lv)*dmgM()*(ev?1.3:1),r:7,ang:a,hits:[],pierce:ev?3:(lv>=4?1:0)});
   }
   S.staple();return true;
 }
 function updWeapons(dt){
   const L=P.lv,am=atkM();
-  if(L.coffee){P.cd.coffee-=dt;if(P.cd.coffee<=0){if(fireCoffee())P.cd.coffee=(1.15-.1*(L.coffee-1))/am;}}
-  if(L.stapler){P.cd.stapler-=dt;if(P.cd.stapler<=0){if(fireStapler())P.cd.stapler=[1.7,1.5,1.4,1.2,1.0][L.stapler-1]/am;}}
+  if(L.coffee){P.cd.coffee-=dt;if(P.cd.coffee<=0){if(fireCoffee())P.cd.coffee=(1.15-.1*(L.coffee-1))/am/(P.evo.coffee?2.5:1);}}
+  if(L.stapler){P.cd.stapler-=dt;if(P.cd.stapler<=0){if(fireStapler())P.cd.stapler=[1.7,1.5,1.4,1.2,1.0][L.stapler-1]/am/(P.evo.stapler?3.5:1);}}
   if(L.nova){
     P.cd.nova-=dt;
     if(P.cd.nova<=0){
-      P.cd.nova=[5,4.5,4,3.4,2.8][L.nova-1]/am;
-      novas.push({id:G.idc++,x:P.x,y:P.y,r:10,maxR:140+35*L.nova,dmg:(14+6*L.nova)*dmgM()});
+      const ne=P.evo.nova;P.cd.nova=[5,4.5,4,3.4,2.8][L.nova-1]/am/(ne?2.2:1);
+      novas.push({id:G.idc++,x:P.x,y:P.y,r:10,maxR:(140+35*L.nova)*(ne?1.5:1),dmg:(14+6*L.nova)*dmgM()*(ne?1.8:1),txt:ne?'MASS MAILING!!':undefined});
+      if(ne)for(const g of gems)if(Math.hypot(g.x-P.x,g.y-P.y)<900){g.mag=true;g.fast=true;}
       S.nova();shake(4);
     }
   }
   if(L.undo){
     P.cd.undo-=dt;
     if(P.cd.undo<=0){
-      P.cd.undo=[14,12,10,8,6][L.undo-1]/am;
-      const h=[12,16,20,25,30][L.undo-1];
+      const ue=P.evo.undo;P.cd.undo=[14,12,10,8,6][L.undo-1]/am/(ue?1.8:1);
+      const h=ue?Math.round(P.max*.4):[12,16,20,25,30][L.undo-1];
+      if(ue){P.inv=1.5;shake(8);for(const e of enemies){if(e.dead)continue;const ex=e.x-P.x,ey=e.y-P.y;if(ex*ex+ey*ey<500*500)hurtEnemy(e,60*dmgM(),ex*1.2,ey*1.2);}popL(P.x,P.y,90,'CTRL+ALT+DEL!','#ff8a3c',26);}
       if(P.hp<P.max){P.hp=Math.min(P.max,P.hp+h);popL(P.x,P.y,60,'+'+h+' CTRL+Z','#7ee081',22);}
       else popL(P.x,P.y,60,'CTRL+Z','#7ee081',18);
       burst(P.x,P.y,14,['#7ee081','#fff'],200,5);S.undo();
@@ -541,11 +588,11 @@ function updWeapons(dt){
   // keyboards
   P.kb.length=0;
   if(L.keyboard){
-    const n=L.keyboard+1,R=85+6*L.keyboard;
-    P.kbAng+=dt*(2.6+.3*L.keyboard)*am*.9;
-    const dmg=(9+3*L.keyboard)*dmgM();
+    const ke=P.evo.keyboard,n=L.keyboard+1+(ke?4:0),R0=85+6*L.keyboard;
+    P.kbAng+=dt*(2.6+.3*L.keyboard)*am*.9*(ke?1.3:1);
+    const dmg=(9+3*L.keyboard)*dmgM()*(ke?2:1);
     for(let i=0;i<n;i++){
-      const a=P.kbAng+i/n*TAU,x=P.x+Math.cos(a)*R,y=P.y+Math.sin(a)*R;
+      const a=P.kbAng+i/n*TAU,R=ke&&i%2?R0+55:R0,x=P.x+Math.cos(a)*R,y=P.y+Math.sin(a)*R;
       P.kb.push({x,y,a});
       for(const e of enemies){
         if(e.dead||e.kbT>G.time)continue;
@@ -616,20 +663,29 @@ function railHit(){
   return null;
 }
 const DIRS=[[1,0],[0,1],[-1,0],[0,-1]];
-const FORCED_RAMPS=[{cx:-40,cy:160,l:150,w:110,h:48,dir:0}];
+const FORCED_RAMPS=[{cx:-40,cy:160,l:150,w:110,h:48,dir:0},{cx:170,cy:-360,l:320,w:250,h:90,dir:0,pipe:true}];
 const rampCache=new Map();
 function rampsInCell(cx,cy){
   const k=cx+','+cy;let r=rampCache.get(k);if(r)return r;
   r=[];
-  if(hash2(cx+101,cy-57)<.4)r.push({cx:(cx+.25+.5*hash2(cx*3+1,cy*5+2))*RC,cy:(cy+.25+.5*hash2(cx*9+4,cy*2+8))*RC,l:150,w:110,h:48,dir:(hash2(cx+13,cy+29)*4)|0});
+  const px=(cx+.25+.5*hash2(cx*3+1,cy*5+2))*RC,py=(cy+.25+.5*hash2(cx*9+4,cy*2+8))*RC;
+  if(hash2(cx+101,cy-57)<.35)r.push({cx:px,cy:py,l:150,w:110,h:48,dir:(hash2(cx+13,cy+29)*4)|0});
+  else if(hash2(cx+7,cy+3)<.3)r.push({cx:px,cy:py,l:300,w:240,h:90,dir:(hash2(cx+5,cy+9)*2)|0,pipe:true});
   rampCache.set(k,r);return r;
 }
 function rampAt(x,y){
   const px=Math.floor(x/RC),py=Math.floor(y/RC);
   const test=r=>{
     const d=DIRS[r.dir],ox=x-r.cx,oy=y-r.cy,along=ox*d[0]+oy*d[1],side=-ox*d[1]+oy*d[0];
-    if(along<-r.l/2||along>r.l/2||Math.abs(side)>r.w/2)return null;
-    return{r,t:(along+r.l/2)/r.l,h:r.h};
+    if(along<-r.l/2||along>r.l/2)return null;
+    if(r.pipe){ // halfpipe: flat bottom in the middle, curved walls up each side
+      const v=side/(r.w/2);if(Math.abs(v)>1)return null;
+      const a=Math.max(0,(Math.abs(v)-.4)/.6);
+      return{r,v,t:Math.abs(v),h:r.h*a*a};
+    }
+    if(Math.abs(side)>r.w/2)return null;
+    const t=(along+r.l/2)/r.l;
+    return{r,t,h:r.h*t};
   };
   for(const r of FORCED_RAMPS){const h=test(r);if(h)return h;}
   for(let yy=py-1;yy<=py+1;yy++)for(let xx=px-1;xx<=px+1;xx++)for(const r of rampsInCell(xx,yy)){const h=test(r);if(h)return h;}
@@ -644,7 +700,7 @@ function startGrind(h){
 }
 function endGrind(jumped){
   const g=P.grind,r=g.r,L=Math.hypot(r.bx-r.ax,r.by-r.ay),ux=(r.bx-r.ax)/L*g.dir,uy=(r.by-r.ay)/L*g.dir;
-  P.grind=null;P.ex=ux*420;P.ey=uy*420;P.vz=jumped?640:430;P.z=1;P.tricksDone++;bump();S.jump();
+  P.grind=null;P.vx=ux*400;P.vy=uy*400;P.vz=jumped?640:430;P.z=1;P.tricksDone++;bump();S.jump();
   popL(P.x,P.y,P.z+130,'GRIND x'+P.chain,'#ffd23f',24);
 }
 function land(){
@@ -662,7 +718,11 @@ function jump(){
   if((P.z<=0||P.onRamp)&&P.vz<=0){P.vz=640;P.z+=.01;P.onRamp=null;S.jump();}
 }
 function trick(type){
-  if(state!=='play'||P.grind||P.trick||P.z<18)return;
+  if(state!=='play'||P.grind||P.z<18)return;
+  if(P.trick){ // Z and X together (within a moment) = backflip
+    if(P.trick.type!=='back'&&P.trick.type!==type&&P.trick.t<.2)P.trick={type:'back',t:0,dur:.65,hit:0};
+    return;
+  }
   P.trick={type,t:0,dur:type==='spin'?.5:.4,hit:0};
 }
 function skate(dt,ix,iy,sp,moving){
@@ -687,13 +747,30 @@ function skate(dt,ix,iy,sp,moving){
     if(g.s<=0||g.s>=L)endGrind(false);
     return;
   }
-  P.x+=ix*sp*dt+P.ex*dt;P.y+=iy*sp*dt+P.ey*dt;
+  // momentum skating: kick off the ground to get rolling, carve once you have speed, coast when idle
+  const air=P.z>2&&!P.onRamp;
+  let spd=Math.hypot(P.vx,P.vy);
+  if(moving){
+    if(!air&&spd<sp*.55){
+      P.pushT-=dt;
+      if(P.pushT<=0){P.pushT=.38;P.vx+=ix*105;P.vy+=iy*105;P.kick=.34;S.push();}
+      const k=1-Math.exp(-3*dt);P.vx+=(ix*spd-P.vx)*k;P.vy+=(iy*spd-P.vy)*k;
+    }else{
+      const k=1-Math.exp(-(air?.9:2.4)*dt);P.vx+=(ix*sp-P.vx)*k;P.vy+=(iy*sp-P.vy)*k;
+    }
+  }else if(!air){
+    const f=Math.exp(-(P.onRamp?.35:.9)*dt);P.vx*=f;P.vy*=f;if(spd<6)P.vx=P.vy=0;
+  }
+  spd=Math.hypot(P.vx,P.vy);
+  if(!air&&spd>sp*1.25){const f=Math.exp(-1.5*dt);P.vx*=f;P.vy*=f;spd*=f;}
+  P.x+=(P.vx+P.ex)*dt;P.y+=(P.vy+P.ey)*dt;
   const dc=Math.exp(-3*dt);P.ex*=dc;P.ey*=dc;
-  P.moving=moving;if(moving)P.walk+=dt*sp/190;
+  P.kick=Math.max(0,P.kick-dt);
+  P.speedNow=spd;P.maxSp=sp;P.moving=spd>25||P.kick>0;P.walk+=dt*spd/190;
   const tk=P.trick;
   if(tk){
     tk.t+=dt;
-    if(tk.type==='spin'){
+    if(tk.type==='spin'||tk.type==='back'){
       tk.hit-=dt;
       if(tk.hit<=0){
         tk.hit=.1;
@@ -704,19 +781,34 @@ function skate(dt,ix,iy,sp,moving){
         }
       }
     }
-    if(tk.t>=tk.dur){P.tricksDone++;bump();popL(P.x,P.y,P.z+110,(tk.type==='spin'?'360':'KICKFLIP')+' x'+P.chain,'#ffe14d',26);S.trick();P.trick=null;}
+    if(tk.t>=tk.dur){
+      const big=tk.type==='back';
+      P.tricksDone+=big?2:1;bump();if(big)bump();
+      popL(P.x,P.y,P.z+110,(big?'BACKFLIP!!':tk.type==='spin'?'360':'KICKFLIP')+' x'+P.chain,'#ffe14d',big?32:26);
+      S.trick();P.trick=null;
+    }
   }
   const rp=rampAt(P.x,P.y);
   if(P.z>0||P.vz>0||rp||P.onRamp){
-    const hs=rp?rp.h*rp.t:0;
+    const hs=rp?rp.h:0;
     P.vz-=1900*dt;P.z+=P.vz*dt;
     if(rp&&P.z<=hs){
       if(P.vz<-120)land();
-      P.z=hs;P.vz=0;P.onRamp=rp.r;P.rt=rp.t;
+      P.z=hs;P.vz=0;P.onRamp=rp.r;P.rt=rp.t;P.rv=rp.v||0;
+      if(rp.r.pipe){ // gravity slides you back down the wall toward the flat bottom
+        const d=DIRS[rp.r.dir],s=Math.sign(rp.v)*Math.max(0,Math.abs(rp.v)-.35);
+        P.vx-=-d[1]*s*750*dt;P.vy-=d[0]*s*750*dt;
+      }
     }else if(P.onRamp&&!rp){
-      if(P.rt>.6){
-        const d=DIRS[P.onRamp.dir];
-        P.vz=420+380*P.rt;P.ex+=d[0]*320;P.ey+=d[1]*320;bump();S.jump();
+      const d=DIRS[P.onRamp.dir];
+      if(P.onRamp.pipe){
+        if(P.rt>.7){
+          const sg=Math.sign(P.rv)||1;
+          P.vz=450+200*Math.min(1,(P.rt-.7)/.3);P.vx+=-d[1]*sg*260;P.vy+=d[0]*sg*260;bump();S.jump();
+          popL(P.x,P.y,P.z+120,'AIR x'+P.chain,'#7dd3ff',24);
+        }
+      }else if(P.rt>.6){
+        P.vz=420+380*P.rt;P.vx+=d[0]*320;P.vy+=d[1]*320;bump();S.jump();
         popL(P.x,P.y,P.z+120,'LAUNCH x'+P.chain,'#ffb02e',24);
       }
       P.onRamp=null;
@@ -739,7 +831,7 @@ function update(dt){
   let ix=(keys.right?1:0)-(keys.left?1:0),iy=(keys.down?1:0)-(keys.up?1:0);
   const moving=!!(ix||iy);
   if(moving){const l=Math.hypot(ix,iy);ix/=l;iy/=l;}
-  const sp=190*(1+.12*P.lv.speed)*spdBuff();
+  const sp=210*(1+.12*P.lv.speed)*spdBuff();
   if(ix)P.face=ix>0?1:-1;
   if(P.tSpeed>0)P.tSpeed-=dt;if(P.tAtk>0)P.tAtk-=dt;if(P.buff>0)P.buff-=dt;
   if(spdBuff()>1){
@@ -755,19 +847,16 @@ function update(dt){
   // grid
   gHead.fill(-1);
   const ox=P.x-GW*GC/2,oy=P.y-GH*GC/2;
-  const spdM=1+Math.min(G.time/420,.7),kd=Math.exp(-9*dt),R2=Math.hypot(W,H)*1.1+500;
+  const spdM=1+Math.min(G.time/300,.9),kd=Math.exp(-9*dt),R2=Math.hypot(W,H)*1.1+500;
   for(let i=0;i<enemies.length;i++){
     const e=enemies[i];
     let dx=P.x-e.x,dy=P.y-e.y,d=Math.hypot(dx,dy)||1;
     let vx=dx/d*e.spd*spdM,vy=dy/d*e.spd*spdM;
     if(e.t.zig){const z=Math.sin(G.time*4+e.ph)*e.spd*.9;vx+=-dy/d*z;vy+=dx/d*z;}
-    e.x+=(vx+e.kx)*dt;e.y+=(vy+e.ky)*dt;e.kx*=kd;e.ky*=kd;e.flash-=dt;
+    e.x+=(vx+e.kx+e.dvx)*dt;e.y+=(vy+e.ky+e.dvy)*dt;e.kx*=kd;e.ky*=kd;e.flash-=dt;
     if(!e.boss&&d>R2){const[nx,ny]=ringPos();e.x=nx;e.y=ny;}
     if(d<e.r+P.r*.8&&P.z<22&&!P.grind)hurtPlayer(e.dmg);
-    if(e.boss){
-      e.minionT-=dt;
-      if(e.minionT<=0){e.minionT=3;for(let k=0;k<5;k++)spawnEnemy(ETYPES[k%2],e.x+rnd(-80,80),e.y+rnd(-80,80));popL(e.x,e.y,110,'Quick sync?','#ffdede',22);}
-    }
+    if(e.boss)bossAI(e,dt,dx,dy,d);
     const cx=((e.x-ox)/GC)|0,cy=((e.y-oy)/GC)|0;
     if(cx>=0&&cx<GW&&cy>=0&&cy<GH){const c=cy*GW+cx;e.cell=c;gNext[i]=gHead[c];gHead[c]=i;}else e.cell=-1;
   }
@@ -792,6 +881,12 @@ function update(dt){
   }
   updWeapons(dt);
   updProjs(dt);
+  // boss shockwave rings hurt the player unless they are airborne / grinding
+  for(const h of hrings){
+    h.r+=dt*420;
+    if(!h.hit&&Math.abs(Math.hypot(P.x-h.x,P.y-h.y)-h.r)<26&&P.z<22&&!P.grind){h.hit=true;hurtPlayer(14+G.time/20);}
+  }
+  hrings=hrings.filter(h=>h.r<h.maxR);
 
   // gems
   const pr=70*(1+.3*P.lv.pickup);
@@ -826,29 +921,59 @@ function update(dt){
   // compact
   let j=0;for(let i=0;i<enemies.length;i++)if(!enemies[i].dead)enemies[j++]=enemies[i];enemies.length=j;
   if(G.boss&&G.boss.dead)G.boss=null;
-  if(G.xp>=xpNeed()&&state==='play')levelUp();
+  if(G.evoPending&&state==='play'){G.evoPending=false;bossReward();}
+  else if(G.xp>=xpNeed()&&state==='play')levelUp();
 }
 
 // ---------- Level up ----------
-function levelUp(){
-  G.xp-=xpNeed();G.level++;P.spin=1.4;S.levelup();banner('LEVEL UP!','#7ee081');
+const evoReady=()=>EVOS.filter(ev=>!P.evo[ev.id]&&P.lv[ev.id]>=5&&P.lv[ev.needs]>=3);
+function synergyNote(id){
+  const ev=EVOS.find(e=>e.id===id||e.needs===id);
+  return ev?'<div class="syn">Synergy: '+UPG[ev.id].name+' Lv5 + '+UPG[ev.needs].name+' Lv3 → '+ev.name+' (boss reward)</div>':'';
+}
+function shuffledPool(){
   const pool=Object.keys(UPG).filter(k=>P.lv[k]<5);
   for(let i=pool.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[pool[i],pool[j]]=[pool[j],pool[i]];}
-  choices=pool.length?pool.slice(0,3):['heal'];
+  return pool;
+}
+function openPicker(title,list){
+  choices=list;$('luTitle').textContent=title;
   const box=$('cards');box.innerHTML='';
-  choices.forEach((id,i)=>{
+  list.forEach((id,i)=>{
     const c=document.createElement('div');c.className='card';
-    if(id==='heal')c.innerHTML='<div class="key">'+(i+1)+'</div><div class="ic">🍕</div><div class="nm">Free Pizza Friday</div><div class="lv">FULL HEAL</div><div class="ds">Everything is maxed. Enjoy the pizza.</div>';
-    else{const u=UPG[id],l=P.lv[id];
-      c.innerHTML='<div class="key">'+(i+1)+'</div><div class="ic">'+u.icon+'</div><div class="nm">'+u.name+'</div><div class="lv">'+(l?'Lv '+l+' → '+(l+1):'NEW!')+'</div><div class="ds">'+u.lines[l]+'</div>';}
+    const key='<div class="key">'+(i+1)+'</div>';
+    if(id==='heal')c.innerHTML=key+'<div class="ic">🍕</div><div class="nm">Free Pizza Friday</div><div class="lv">FULL HEAL</div><div class="ds">Everything is maxed. Enjoy the pizza.</div>';
+    else if(id.startsWith('evo:')){
+      const ev=EVOS.find(e=>e.id===id.slice(4));c.classList.add('evo');
+      c.innerHTML=key+'<div class="ic">'+ev.icon+'</div><div class="nm">'+ev.name+'</div><div class="lv">SYNERGY EVOLUTION!</div><div class="ds">'+ev.desc+'</div>';
+    }else{
+      const u=UPG[id],l=P.lv[id];
+      c.innerHTML=key+'<div class="ic">'+u.icon+'</div><div class="nm">'+u.name+'</div><div class="lv">'+(l?'Lv '+l+' → '+(l+1):'NEW!')+'</div><div class="ds">'+u.lines[l]+'</div>'+synergyNote(id);
+    }
     c.addEventListener('click',()=>choose(i));box.appendChild(c);
   });
   state='levelup';$('levelup').classList.add('show');
+}
+function levelUp(){
+  G.xp-=xpNeed();G.level++;P.spin=1.4;S.levelup();banner('LEVEL UP!','#7ee081');
+  const pool=shuffledPool();
+  openPicker('LEVEL UP! 🎉',pool.length?pool.slice(0,3):['heal']);
+}
+function bossReward(){
+  S.levelup();
+  const evo=evoReady().slice(0,3).map(e=>'evo:'+e.id);
+  if(evo.length){openPicker('BOSS DEFEATED! SYNERGY UNLOCKED ⚡',evo);return;}
+  const pool=shuffledPool();
+  openPicker('BOSS DEFEATED! BONUS UPGRADE 🎁',pool.length?pool.slice(0,3):['heal']);
 }
 function choose(i){
   if(state!=='levelup'||!choices[i])return;
   const id=choices[i];
   if(id==='heal')P.hp=P.max;
+  else if(id.startsWith('evo:')){
+    const ev=EVOS.find(e=>e.id===id.slice(4));P.evo[ev.id]=true;
+    banner(ev.name.toUpperCase()+'!!','#ff8a3c');S.honk();shake(10);burst(P.x,P.y,40,['#ff8a3c','#ffe14d','#fff'],400,7);
+  }
   else{if(P.lv[id]===0&&P.cd[id]!==undefined)P.cd[id]=.4;P.lv[id]++;}
   P.spin=1.4;state='play';$('levelup').classList.remove('show');
   S.pizza();
@@ -911,14 +1036,14 @@ function limb(pts){ctx.beginPath();ctx.moveTo(pts[0],pts[1]);for(let i=2;i<pts.l
 function drawPlayer(px,py){
   const mv=P.moving,dead=state==='dead',f=P.face||1;
   const ph=P.walk*14,bob=mv?Math.sin(ph):Math.sin(G.t*3)*.3;
-  const lean=mv?5:0,sw=mv?Math.sin(ph):0;
+  const lean=mv?4+Math.min(6,(P.speedNow||0)/40):0,sw=mv?Math.sin(ph):0,ks=P.kick>0?Math.sin(Math.PI*(1-P.kick/.34)):0;
   let hrot=mv?Math.sin(P.walk*7)*.1:0;
   if(P.spin>0){const q=1-P.spin/1.4;hrot+=(1-Math.pow(1-q,3))*TAU*3;}
   ctx.globalAlpha=(P.inv>0&&Math.floor(P.inv*20)%2===0)?.45:1;
   const air=P.z>8,lift=P.z+(P.grind?16:0),tk=P.trick,pr=tk?tk.t/tk.dur:0;
   let sxm=f*(1+.04*bob);
   if(tk&&tk.type==='spin'){const c=Math.cos(pr*TAU);sxm*=(c<0?-1:1)*Math.max(.12,Math.abs(c));}
-  tf(px,py-lift-(mv&&!air&&!P.grind?Math.abs(bob)*3:0),dead?G.deadT*9:(mv?Math.sin(P.walk*7)*.05:0)+(P.grind?-.08*f:0),sxm,1-.04*bob);
+  tf(px,py-lift-(mv&&!air&&!P.grind?Math.abs(bob)*3:0),dead?G.deadT*9:(mv?Math.sin(P.walk*7)*.05:0)+(P.grind?-.08*f:0)+(tk&&tk.type==='back'?-f*pr*TAU:0),sxm,1-.04*bob);
   ctx.lineCap='round';ctx.lineJoin='round';
   // skateboard (kickflip rotates it around its long axis)
   ctx.save();
@@ -930,9 +1055,9 @@ function drawPlayer(px,py){
   for(const wx of[-20,20]){ctx.beginPath();ctx.arc(wx,47,5.5,0,TAU);ctx.fill();ctx.stroke();}
   ctx.restore();
   // stick body: white under-stroke for contrast, then black
-  const kf=[lean*.4+16,18],kb=[lean*.4-16,18];
+  const kf=[lean*.4+16,18],kb=[lean*.4-14-12*ks,18+4*ks];
   const body=()=>{
-    limb([0,0,kb[0],kb[1],-14,35]);                               // back leg
+    limb([0,0,kb[0],kb[1],-14-26*ks,35+19*ks]);                               // back leg
     limb([0,0,kf[0],kf[1],16,35]);                                // front leg
     limb([lean,-30,0,0]);                                         // torso
     limb([lean,-26,lean-24,(air?-34:-10)+sw*6]);                  // back arm
@@ -950,7 +1075,28 @@ function poly(pts,fill){
   for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i][0],pts[i][1]);
   ctx.closePath();ctx.fillStyle=fill;ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.lineJoin='round';ctx.stroke();
 }
+function drawPipe(r,cx,cy){
+  const d=DIRS[r.dir],qx=-d[1],qy=d[0],hw=r.w/2,N=10;
+  const pt=(u,v,z)=>{const wx=r.cx+d[0]*(u-.5)*r.l+qx*v*hw,wy=r.cy+d[1]*(u-.5)*r.l+qy*v*hw;return[pX(wx,wy)-cx,pY(wx,wy)-cy-z];};
+  const hf=v=>{const a=Math.max(0,(Math.abs(v)-.4)/.6);return r.h*a*a;};
+  const A=pt(0,-1,0),B=pt(1,-1,0),C=pt(1,1,0),D=pt(0,1,0),T1=pt(0,-1,r.h),T2=pt(1,1,r.h);
+  if(Math.max(A[0],B[0],C[0],D[0])<-20||Math.min(A[0],B[0],C[0],D[0])>W+20||Math.max(A[1],B[1],C[1],D[1])<-20||Math.min(T1[1],T2[1],A[1],D[1])>H+20)return;
+  poly([A,B,C,D],'rgba(0,0,0,.25)');
+  const cap=u=>{const pts=[pt(u,-1,0)];for(let i=0;i<=N;i++){const v=-1+2*i/N;pts.push(pt(u,v,hf(v)));}pts.push(pt(u,1,0));poly(pts,'#6b7788');};
+  const nearEnd=(d[0]+d[1])>0?1:0;
+  cap(1-nearEnd);
+  const fwd=(qx+qy)>0;
+  for(let n=0;n<N;n++){
+    const i=fwd?n:N-1-n,v0=-1+2*i/N,v1=-1+2*(i+1)/N;
+    const sl=hf(v1)-hf(v0),l=Math.max(34,Math.min(70,52+(v1>0?-1:1)*sl*.5));
+    poly([pt(0,v0,hf(v0)),pt(1,v0,hf(v0)),pt(1,v1,hf(v1)),pt(0,v1,hf(v1))],'hsl(215,16%,'+l+'%)');
+  }
+  cap(nearEnd);
+  ctx.lineCap='round';ctx.strokeStyle='#e8edf5';ctx.lineWidth=5;
+  for(const v of[-1,1]){const a=pt(0,v,r.h),b=pt(1,v,r.h);limb([a[0],a[1],b[0],b[1]]);}
+}
 function drawRamp(r,cx,cy){
+  if(r.pipe){drawPipe(r,cx,cy);return;}
   const d=DIRS[r.dir],qx=-d[1],qy=d[0],hw=r.w/2;
   const pt=(u,v,z)=>{const wx=r.cx+d[0]*(u-.5)*r.l+qx*v*hw,wy=r.cy+d[1]*(u-.5)*r.l+qy*v*hw;return[pX(wx,wy)-cx,pY(wx,wy)-cy-z];};
   const A=pt(0,-1,0),B=pt(0,1,0),C=pt(1,1,0),D=pt(1,-1,0),Ct=pt(1,1,r.h),Dt=pt(1,-1,r.h);
@@ -1033,6 +1179,12 @@ function render(){
     if(a>.4)txt(n.txt||'REPLY ALL!!',x,y-n.r*.4,18+n.r*.06,'#fff');
   }
 
+  // hostile boss rings
+  for(const h of hrings){
+    const a=1-h.r/h.maxR,x=pX(h.x,h.y)-cx,y=pY(h.x,h.y)-cy;
+    ctx.strokeStyle='rgba(255,70,70,'+(.35+.55*a)+')';ctx.lineWidth=6+10*a;
+    ctx.beginPath();ctx.ellipse(x,y,h.r,h.r*.5,0,0,TAU);ctx.stroke();
+  }
   // depth-sorted enemies + player
   visBuf.length=0;
   for(const e of enemies){
@@ -1113,14 +1265,14 @@ function drawHUD(){
   txt('👾 '+enemies.length,W-16,80,16,'#bbb','right');
   if(G.boss){
     const bw=Math.min(600,W-40);
-    txt('THE STEERING COMMITTEE',W/2,86,20,'#ff8a8a');
+    txt(G.boss.t.name,W/2,86,20,'#ff8a8a');
     bar(W/2-bw/2,94,bw,18,G.boss.hp/G.boss.maxhp,'#ff3b3b','#411');
   }
   let x=16;
   for(const id of Object.keys(UPG)){
     if(!P.lv[id])continue;
     const sp=sprite(UPG[id].icon,28);ctx.drawImage(sp.n,x,H-62,sp.d,sp.d);
-    txt(String(P.lv[id]),x+sp.d-4,H-18,16,P.lv[id]>=5?'#ffe14d':'#fff');x+=sp.d+10;
+    txt(P.evo[id]?'★':String(P.lv[id]),x+sp.d-4,H-18,16,P.evo[id]?'#ff8a3c':(P.lv[id]>=5?'#ffe14d':'#fff'));x+=sp.d+10;
   }
   if(G.banner&&G.banner.t>0){
     const b=G.banner,a=Math.min(1,b.t),sc=1+Math.max(0,b.t-2)*2;
