@@ -36,7 +36,7 @@ button:hover{background:#fff27a}
   <div id="face" class="face">🙂</div>
   <h1 id="nameTitle">[NAME]</h1>
   <div class="blink">PRESS SPACE TO SURVIVE THE WORKDAY</div>
-  <div class="hint">WASD / Arrows to move. Attacks are automatic. Collect coffee beans, grab White Monsters for a rush, and avoid the Steering Committee. M = mute, P = pause.</div>
+  <div class="hint">WASD / Arrows to move. SPACE = jump, then Z = kickflip, X = 360 in the air (land tricks for a shockwave). Jump onto a rail to grind it! Attacks are automatic. Collect coffee beans, grab White Monsters for a rush, and avoid the Steering Committee. M = mute, P = pause.</div>
   <input id="nameIn" maxlength="16" placeholder="Type your name…" autocomplete="off" spellcheck="false">
   <div class="hint">Type a name, then press Enter to start.</div>
 </div>
@@ -116,6 +116,10 @@ const S={
     [392,523,659,784,1047].forEach((f,i)=>tone(f,.1,'square',.07,0,.3+i*.06));
   },
   nuke:()=>{tone(110,.7,'sawtooth',.2,-80);tone(70,.8,'square',.15,-40,.05);S.monster();},
+  jump:()=>tone(260,.15,'sine',.1,500),
+  trick:()=>{tone(700,.06,'square',.06);tone(1000,.08,'square',.06,0,.06);},
+  land:()=>tone(90,.12,'triangle',.15,-40),
+  grindTick:()=>sfx('grind',70,()=>tone(1800+Math.random()*600,.05,'sawtooth',.025)),
   trombone:()=>{
     if(!actx||muted)return;
     let t=actx.currentTime+.05;
@@ -292,7 +296,7 @@ const REVIEWS=[
 let state='start',paused=false,P,G,enemies,gems,projs,pops,parts,novas,choices=[];
 const keys={};
 function reset(){
-  P={x:0,y:0,hp:100,max:100,r:24,inv:0,spin:0,walk:0,idle:0,kb:[],kbAng:0,buff:0,tSpeed:0,tAtk:0,face:1,
+  P={x:0,y:0,hp:100,max:100,r:24,inv:0,spin:0,walk:0,idle:0,kb:[],kbAng:0,buff:0,tSpeed:0,tAtk:0,face:1,z:0,vz:0,trick:null,tricksDone:0,grind:null,ex:0,ey:0,ix:0,iy:0,
     lv:{coffee:1,keyboard:0,nova:0,stapler:0,undo:0,speed:0,pickup:0,dmg:0,atk:0},
     cd:{coffee:.3,nova:2,stapler:1,undo:8}};
   enemies=[];gems=[];projs=[];pops=[];parts=[];novas=[];
@@ -509,6 +513,103 @@ function updProjs(dt){
   novas=novas.filter(n=>n.r<n.maxR);
 }
 
+// ---------- Skating: jump, tricks, rails ----------
+const RC=640,railCache=new Map();
+function hash2(a,b){let h=(Math.imul(a,374761393)+Math.imul(b,668265263))|0;h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967296;}
+function railsInCell(cx,cy){
+  const k=cx+','+cy;let r=railCache.get(k);if(r)return r;
+  r=[];const h=hash2(cx,cy),n=h<.2?2:1;
+  const mk=(px,py,a,len)=>{const c=Math.cos(a)*len/2,s=Math.sin(a)*len/2;r.push({ax:px-c,ay:py-s,bx:px+c,by:py+s});};
+  if(cx===0&&cy===0)mk(300,160,0,320);
+  else if(h<.75)for(let i=0;i<n;i++){
+    mk((cx+.2+.6*hash2(cx*7+i,cy*13+3))*RC,(cy+.2+.6*hash2(cx*5+i,cy*11+7))*RC,
+      [0,Math.PI/4,Math.PI/2,-Math.PI/4][(hash2(cx+i*5,cy*3+9)*4)|0],260+hash2(cx+i,cy+17)*160);
+  }
+  railCache.set(k,r);return r;
+}
+function railHit(){
+  const px=Math.floor(P.x/RC),py=Math.floor(P.y/RC);
+  for(let yy=py-1;yy<=py+1;yy++)for(let xx=px-1;xx<=px+1;xx++)for(const r of railsInCell(xx,yy)){
+    const L=Math.hypot(r.bx-r.ax,r.by-r.ay),ux=(r.bx-r.ax)/L,uy=(r.by-r.ay)/L;
+    const t=(P.x-r.ax)*ux+(P.y-r.ay)*uy,d=Math.abs((P.x-r.ax)*uy-(P.y-r.ay)*ux);
+    if(t>8&&t<L-8&&d<30)return{r,s:t,L,ux,uy};
+  }
+  return null;
+}
+function startGrind(h){
+  let dot=P.ix*h.ux+P.iy*h.uy;if(Math.abs(dot)<.01)dot=P.face*h.ux||P.face;
+  P.grind={r:h.r,s:h.s,dir:dot>=0?1:-1,hit:0,xpT:.3};P.trick=null;P.z=0;P.vz=0;P.ex=P.ey=0;
+  pop(P.x,P.y-110,'GRIND!','#ffd23f',26);S.trick();
+}
+function endGrind(jumped){
+  const g=P.grind,r=g.r,L=Math.hypot(r.bx-r.ax,r.by-r.ay),ux=(r.bx-r.ax)/L*g.dir,uy=(r.by-r.ay)/L*g.dir;
+  P.grind=null;P.ex=ux*420;P.ey=uy*420;P.vz=jumped?640:430;P.z=1;P.tricksDone++;S.jump();
+}
+function land(){
+  const n=Math.min(6,P.tricksDone);
+  burst(P.x,P.y+44,6,['#ccc','#aaa','#fff'],120,4);S.land();
+  if(n>0){
+    novas.push({id:G.idc++,x:P.x,y:P.y,r:10,maxR:110+30*n,dmg:(16+8*n)*dmgM(),txt:'SICK!!'});
+    G.xp+=n*2;banner('NAILED IT! x'+n,'#ffe14d');shake(7);S.trick();
+  }
+  P.tricksDone=0;P.trick=null;
+}
+function jump(){
+  if(P.grind){endGrind(true);return;}
+  if(P.z<=0&&P.vz<=0){P.vz=640;P.z=.01;S.jump();}
+}
+function trick(type){
+  if(state!=='play'||P.grind||P.trick||P.z<18)return;
+  P.trick={type,t:0,dur:type==='spin'?.5:.4,hit:0};
+}
+function skate(dt,ix,iy,sp,moving){
+  P.ix=ix;P.iy=iy;
+  const g=P.grind;
+  if(g){
+    const r=g.r,L=Math.hypot(r.bx-r.ax,r.by-r.ay),ux=(r.bx-r.ax)/L,uy=(r.by-r.ay)/L;
+    g.s+=g.dir*dt*(430+60*P.lv.speed);
+    P.x=r.ax+ux*g.s;P.y=r.ay+uy*g.s;P.moving=true;P.walk+=dt*2;P.face=ux*g.dir>=0?1:-1;
+    parts.push({x:P.x-ux*g.dir*10,y:P.y+44,vx:rnd(-90,90)-ux*g.dir*120,vy:rnd(-140,-20),life:.35,max:.35,c:pick(['#ffd23f','#ff8a3c','#fff']),s:4});
+    S.grindTick();
+    g.hit-=dt;
+    if(g.hit<=0){
+      g.hit=.1;
+      for(const e of enemies){
+        if(e.dead)continue;
+        const dx=e.x-P.x,dy=e.y-P.y,rr=e.r+42;
+        if(dx*dx+dy*dy<rr*rr){const d=Math.hypot(dx,dy)||1;hurtEnemy(e,8*dmgM(),dx/d*260,dy/d*260);}
+      }
+    }
+    g.xpT-=dt;if(g.xpT<=0){g.xpT=.3;G.xp+=1;}
+    if(g.s<=0||g.s>=L)endGrind(false);
+    return;
+  }
+  P.x+=ix*sp*dt+P.ex*dt;P.y+=iy*sp*dt+P.ey*dt;
+  const dc=Math.exp(-3*dt);P.ex*=dc;P.ey*=dc;
+  P.moving=moving;if(moving)P.walk+=dt*sp/190;
+  const tk=P.trick;
+  if(tk){
+    tk.t+=dt;
+    if(tk.type==='spin'){
+      tk.hit-=dt;
+      if(tk.hit<=0){
+        tk.hit=.1;
+        for(const e of enemies){
+          if(e.dead)continue;
+          const dx=e.x-P.x,dy=e.y-P.y,rr=e.r+80;
+          if(dx*dx+dy*dy<rr*rr){const d=Math.hypot(dx,dy)||1;hurtEnemy(e,10*dmgM(),dx/d*300,dy/d*300);}
+        }
+      }
+    }
+    if(tk.t>=tk.dur){P.tricksDone++;pop(P.x,P.y-P.z-110,tk.type==='spin'?'360!':'KICKFLIP!','#ffe14d',26);S.trick();P.trick=null;}
+  }
+  if(P.z>0||P.vz>0){
+    P.vz-=1900*dt;P.z+=P.vz*dt;
+    if(P.vz<0&&P.z<=16){const h=railHit();if(h){startGrind(h);return;}}
+    if(P.z<=0){P.z=0;P.vz=0;land();}
+  }
+}
+
 // ---------- Update ----------
 function update(dt){
   G.time+=dt;G.t+=dt;
@@ -521,8 +622,7 @@ function update(dt){
   if(spdBuff()>1){
     if(moving&&Math.random()<.7)parts.push({x:P.x-ix*20,y:P.y+36,vx:rnd(-30,30),vy:rnd(-30,30),life:.4,max:.4,c:pick(['#fff','#c8ffd0','#7dff9a']),s:7});
   }
-  P.x+=ix*sp*dt;P.y+=iy*sp*dt;P.moving=moving;
-  if(moving)P.walk+=dt*sp/190;
+  skate(dt,ix,iy,sp,moving);
   P.inv=Math.max(0,P.inv-dt);
   spawning(dt);
 
@@ -537,7 +637,7 @@ function update(dt){
     if(e.t.zig){const z=Math.sin(G.time*4+e.ph)*e.spd*.9;vx+=-dy/d*z;vy+=dx/d*z;}
     e.x+=(vx+e.kx)*dt;e.y+=(vy+e.ky)*dt;e.kx*=kd;e.ky*=kd;e.flash-=dt;
     if(!e.boss&&d>R2){const[nx,ny]=ringPos();e.x=nx;e.y=ny;}
-    if(d<e.r+P.r*.8)hurtPlayer(e.dmg);
+    if(d<e.r+P.r*.8&&P.z<22&&!P.grind)hurtPlayer(e.dmg);
     if(e.boss){
       e.minionT-=dt;
       if(e.minionT<=0){e.minionT=3;for(let k=0;k<5;k++)spawnEnemy(ETYPES[k%2],e.x+rnd(-80,80),e.y+rnd(-80,80));pop(e.x,e.y-110,'Quick sync?','#ffdede',22);}
@@ -651,6 +751,11 @@ addEventListener('keydown',e=>{
     e.preventDefault();
     if(state==='start')startGame();
     else if(state==='dead'&&G.overShown&&G.deadT>1.5)startGame();
+    else if(state==='play'&&!paused&&!e.repeat)jump();
+  }
+  if(state==='play'&&!paused&&!e.repeat){
+    if(e.code==='KeyZ'||e.code==='KeyJ')trick('flip');
+    if(e.code==='KeyX'||e.code==='KeyK')trick('spin');
   }
   if(e.code==='Enter'&&state==='dead'&&G.overShown)startGame();
   if(state==='levelup'){const n=+e.key;if(n>=1&&n<=3)choose(n-1);}
@@ -684,22 +789,28 @@ function drawPlayer(px,py){
   let hrot=mv?Math.sin(P.walk*7)*.1:0;
   if(P.spin>0){const q=1-P.spin/1.4;hrot+=(1-Math.pow(1-q,3))*TAU*3;}
   ctx.globalAlpha=(P.inv>0&&Math.floor(P.inv*20)%2===0)?.45:1;
-  tf(px,py-(mv?Math.abs(bob)*3:0),dead?G.deadT*9:(mv?Math.sin(P.walk*7)*.05:0),f*(1+.04*bob),1-.04*bob);
+  const air=P.z>8,lift=P.z+(P.grind?16:0),tk=P.trick,pr=tk?tk.t/tk.dur:0;
+  let sxm=f*(1+.04*bob);
+  if(tk&&tk.type==='spin'){const c=Math.cos(pr*TAU);sxm*=(c<0?-1:1)*Math.max(.12,Math.abs(c));}
+  tf(px,py-lift-(mv&&!air&&!P.grind?Math.abs(bob)*3:0),dead?G.deadT*9:(mv?Math.sin(P.walk*7)*.05:0)+(P.grind?-.08*f:0),sxm,1-.04*bob);
   ctx.lineCap='round';ctx.lineJoin='round';
-  // skateboard
+  // skateboard (kickflip rotates it around its long axis)
+  ctx.save();
+  if(tk&&tk.type==='flip'){ctx.translate(0,40-Math.sin(pr*Math.PI)*10);ctx.scale(1,Math.cos(pr*TAU));ctx.translate(0,-40);}
   ctx.strokeStyle='#000';ctx.lineWidth=11;limb([-30,40,30,40]);limb([-30,40,-38,33]);limb([30,40,38,33]);
   ctx.strokeStyle='#e8632b';ctx.lineWidth=7;limb([-30,40,30,40]);limb([-30,40,-38,33]);limb([30,40,38,33]);
   ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;limb([-22,40,22,40]);
   ctx.fillStyle='#f2f2f2';ctx.strokeStyle='#000';ctx.lineWidth=2;
   for(const wx of[-20,20]){ctx.beginPath();ctx.arc(wx,47,5.5,0,TAU);ctx.fill();ctx.stroke();}
+  ctx.restore();
   // stick body: white under-stroke for contrast, then black
   const kf=[lean*.4+16,18],kb=[lean*.4-16,18];
   const body=()=>{
     limb([0,0,kb[0],kb[1],-14,35]);                               // back leg
     limb([0,0,kf[0],kf[1],16,35]);                                // front leg
     limb([lean,-30,0,0]);                                         // torso
-    limb([lean,-26,lean-24,-10+sw*6]);                            // back arm
-    limb([lean,-26,lean+26,-16-sw*6]);                            // front arm
+    limb([lean,-26,lean-24,(air?-34:-10)+sw*6]);                  // back arm
+    limb([lean,-26,lean+26,(air?-30:-16)-sw*6]);                  // front arm
   };
   ctx.strokeStyle='#fff';ctx.lineWidth=9;body();
   ctx.strokeStyle='#111';ctx.lineWidth=5;body();
@@ -714,6 +825,23 @@ function render(){
   ctx.save();ctx.translate(-(((cx%256)+256)%256),-(((cy%256)+256)%256));
   ctx.fillStyle=bgPat;ctx.fillRect(0,0,W+256,H+256);ctx.restore();
 
+  // rails
+  {
+    const x0=Math.floor((cx-300)/RC),x1=Math.floor((cx+W+300)/RC),y0=Math.floor((cy-300)/RC),y1=Math.floor((cy+H+300)/RC);
+    ctx.lineCap='round';
+    for(let yy=y0;yy<=y1;yy++)for(let xx=x0;xx<=x1;xx++)for(const r of railsInCell(xx,yy)){
+      const ax=r.ax-cx,ay=r.ay-cy+46,bx=r.bx-cx,by=r.by-cy+46;
+      if(Math.max(ax,bx)<-40||Math.min(ax,bx)>W+40||Math.max(ay,by)<-60||Math.min(ay,by)>H+60)continue;
+      ctx.strokeStyle='rgba(0,0,0,.25)';ctx.lineWidth=7;limb([ax,ay+2,bx,by+2]);
+      const L=Math.hypot(bx-ax,by-ay),n=Math.max(2,Math.round(L/90));
+      ctx.strokeStyle='#555';ctx.lineWidth=5;
+      for(let i=0;i<=n;i++){const px=ax+(bx-ax)*i/n,py=ay+(by-ay)*i/n;limb([px,py,px,py-14]);}
+      ctx.strokeStyle='#000';ctx.lineWidth=10;limb([ax,ay-14,bx,by-14]);
+      ctx.strokeStyle='#c9d1db';ctx.lineWidth=6;limb([ax,ay-14,bx,by-14]);
+      ctx.strokeStyle='#fff';ctx.lineWidth=2;limb([ax,ay-16,bx,by-16]);
+      ctx.fillStyle='#ff8a3c';ctx.beginPath();ctx.arc(ax,ay-14,4,0,TAU);ctx.arc(bx,by-14,4,0,TAU);ctx.fill();
+    }
+  }
   // gems
   for(const g of gems){
     const x=g.x-cx,y=g.y-cy;if(x<-30||y<-30||x>W+30||y>H+30)continue;
@@ -734,7 +862,7 @@ function render(){
     const a=1-n.r/n.maxR,x=n.x-cx,y=n.y-cy;
     ctx.fillStyle='rgba(120,200,255,'+(.15*a)+')';ctx.beginPath();ctx.arc(x,y,n.r,0,TAU);ctx.fill();
     ctx.strokeStyle='rgba(180,230,255,'+(.4+.6*a)+')';ctx.lineWidth=4+10*a;ctx.stroke();
-    if(a>.4)txt('REPLY ALL!!',x,y-n.r*.7,18+n.r*.06,'#fff');
+    if(a>.4)txt(n.txt||'REPLY ALL!!',x,y-n.r*.7,18+n.r*.06,'#fff');
   }
   // enemies
   for(const e of enemies){
@@ -758,7 +886,8 @@ function render(){
   base();
   // player
   const px=P.x-cx,py=P.y-cy;
-  ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(px,py+46,34,9,0,0,TAU);ctx.fill();
+  const sk=1-Math.min(.5,P.z/260);
+  ctx.fillStyle='rgba(0,0,0,'+.3*sk+')';ctx.beginPath();ctx.ellipse(px,py+46,34*sk,9*sk,0,0,TAU);ctx.fill();
   if(P.buff>0||P.tSpeed>0||P.tAtk>0){
     ctx.strokeStyle='rgba(255,255,255,'+(.4+.3*Math.sin(G.t*14))+')';ctx.lineWidth=4;
     ctx.beginPath();ctx.arc(px,py,50+Math.sin(G.t*10)*4,0,TAU);ctx.stroke();
@@ -766,7 +895,7 @@ function render(){
   if(state!=='dead'||G.deadT<1){
     drawPlayer(px,py);
   }
-  txt(PLAYER_NAME,px,py-96+Math.sin(G.t*4)*2,22,'#ffe14d');
+  txt(PLAYER_NAME,px,py-96-P.z-(P.grind?16:0)+Math.sin(G.t*4)*2,22,'#ffe14d');
   // particles
   for(const p of parts){
     const a=Math.max(0,p.life/p.max);ctx.fillStyle=p.c;
