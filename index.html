@@ -36,7 +36,7 @@ button:hover{background:#fff27a}
   <div id="face" class="face">🙂</div>
   <h1 id="nameTitle">[NAME]</h1>
   <div class="blink">PRESS SPACE TO SURVIVE THE WORKDAY</div>
-  <div class="hint">WASD / Arrows to move. Hold a direction to kick off and roll (kick again if you slow down). SPACE = jump; in the air Z = kickflip, X = 360, Z+X together = BACKFLIP. Land tricks for a shockwave. Halfpipes and ramps launch you. Ride up ramps to launch, land on rails to grind. Chain tricks, grinds and launches for a STYLE multiplier: more damage and speed until you stop. Attacks are automatic. Collect coffee beans, grab White Monsters for a rush, and beat a boss every 2 minutes to unlock synergy evolutions. M = mute, P = pause.</div>
+  <div class="hint">WASD / Arrows to move. Hold a direction to kick off and roll (kick again if you slow down). SPACE = jump; in the air Z = kickflip, X = 360, Z+X together = BACKFLIP. Land tricks for a shockwave. Halfpipes and ramps launch you, but tap SPACE right at the lip for a PERFECT POP (a much bigger jump). Ride up ramps to launch, land on rails to grind. Chain tricks, grinds and launches for a STYLE multiplier: more damage and speed until you stop. Attacks are automatic. Collect coffee beans, grab White Monsters for a rush, and beat a boss every 2 minutes to unlock synergy evolutions. M = mute, P = pause.</div>
   <input id="nameIn" maxlength="16" placeholder="Type your name…" autocomplete="off" spellcheck="false">
   <div class="hint">Type a name, then press Enter to start.</div>
 </div>
@@ -663,13 +663,13 @@ function railHit(){
   return null;
 }
 const DIRS=[[1,0],[0,1],[-1,0],[0,-1]];
-const FORCED_RAMPS=[{cx:-40,cy:160,l:150,w:110,h:48,dir:0},{cx:170,cy:-360,l:320,w:250,h:90,dir:0,pipe:true}];
+const FORCED_RAMPS=[{cx:-40,cy:160,l:190,w:150,h:52,dir:0},{cx:170,cy:-360,l:320,w:250,h:90,dir:0,pipe:true}];
 const rampCache=new Map();
 function rampsInCell(cx,cy){
   const k=cx+','+cy;let r=rampCache.get(k);if(r)return r;
   r=[];
   const px=(cx+.25+.5*hash2(cx*3+1,cy*5+2))*RC,py=(cy+.25+.5*hash2(cx*9+4,cy*2+8))*RC;
-  if(hash2(cx+101,cy-57)<.35)r.push({cx:px,cy:py,l:150,w:110,h:48,dir:(hash2(cx+13,cy+29)*4)|0});
+  if(hash2(cx+101,cy-57)<.35)r.push({cx:px,cy:py,l:190,w:150,h:52,dir:(hash2(cx+13,cy+29)*4)|0});
   else if(hash2(cx+7,cy+3)<.3)r.push({cx:px,cy:py,l:300,w:240,h:90,dir:(hash2(cx+5,cy+9)*2)|0,pipe:true});
   rampCache.set(k,r);return r;
 }
@@ -704,6 +704,11 @@ function endGrind(jumped){
   popL(P.x,P.y,P.z+130,'GRIND x'+P.chain,'#ffd23f',24);
 }
 function land(){
+  if(P.trick){ // landed mid-trick: wipeout, frozen for a second, chain lost
+    P.stun=1;P.chain=0;P.tricksDone=0;P.trick=null;P.winT=0;P.vx=P.vy=0;P.ex=P.ey=0;
+    shake(9);S.hurt();popL(P.x,P.y,110,'WIPEOUT!','#ff5050',30);burst(P.x,P.y,14,['#fff','#ccc'],220,5);
+    return;
+  }
   const n=Math.min(6,P.tricksDone);
   burst(P.x,P.y+44,6,['#ccc','#aaa','#fff'],120,4);S.land();
   if(n>0){
@@ -711,14 +716,30 @@ function land(){
     G.xp+=n*2;banner('NAILED IT! CHAIN x'+P.chain,'#ffe14d');shake(7);S.trick();
     P.chainT=3;
   }
-  P.tricksDone=0;P.trick=null;
+  P.tricksDone=0;P.trick=null;P.winT=0;
+}
+// Ramps and halfpipes kick you into the air by themselves; pressing SPACE right at the lip gives a much bigger PERFECT POP.
+function launchBoost(){
+  if(G.time-(P.lastJump||-9)<.2){P.vz=P.vz*1.45+120;P.lastJump=-9;P.winT=0;bump();popL(P.x,P.y,P.z+150,'PERFECT POP! x'+P.chain,'#7ee081',28);shake(5);S.trick();}
+  else P.winT=.2;
 }
 function jump(){
+  if(P.stun>0)return;
+  P.lastJump=G.time;
   if(P.grind){endGrind(true);return;}
-  if((P.z<=0||P.onRamp)&&P.vz<=0){P.vz=640;P.z+=.01;P.onRamp=null;S.jump();}
+  if(P.onRamp){
+    const r=P.onRamp,d=DIRS[r.dir],near=P.rt>(r.pipe?.8:.7);
+    const base=r.pipe?Math.max(380,Math.min(850,P.rvz+160)):Math.max(330,Math.min(800,330+P.rvz*3));
+    if(near){P.vz=base*1.45+120;P.lastJump=-9;bump();popL(P.x,P.y,P.z+150,'PERFECT POP! x'+P.chain,'#7ee081',28);shake(5);S.trick();}
+    else P.vz=420;
+    if(!r.pipe){P.vx+=d[0]*120;P.vy+=d[1]*120;}
+    P.onRamp=null;P.z+=.01;S.jump();return;
+  }
+  if(P.z<=0&&P.vz<=0){P.vz=640;P.z+=.01;S.jump();return;}
+  if(P.winT>0&&!P.grind){P.winT=0;P.vz+=380;bump();popL(P.x,P.y,P.z+150,'LATE POP! x'+P.chain,'#7ee081',24);S.trick();}
 }
 function trick(type){
-  if(state!=='play'||P.grind||P.z<18)return;
+  if(state!=='play'||P.grind||P.z<18||P.stun>0)return;
   if(P.trick){ // Z and X together (within a moment) = backflip
     if(P.trick.type!=='back'&&P.trick.type!==type&&P.trick.t<.2)P.trick={type:'back',t:0,dur:.65,hit:0};
     return;
@@ -747,19 +768,20 @@ function skate(dt,ix,iy,sp,moving){
     if(g.s<=0||g.s>=L)endGrind(false);
     return;
   }
+  if(P.stun>0){P.stun-=dt;P.vx=P.vy=0;P.ex=P.ey=0;P.moving=false;P.kick=0;return;}
   // momentum skating: kick off the ground to get rolling, carve once you have speed, coast when idle
   const air=P.z>2&&!P.onRamp;
   let spd=Math.hypot(P.vx,P.vy);
   if(moving){
-    if(!air&&spd<sp*.55){
+    if(!air&&spd<sp*.8){
       P.pushT-=dt;
-      if(P.pushT<=0){P.pushT=.38;P.vx+=ix*105;P.vy+=iy*105;P.kick=.34;S.push();}
+      if(P.pushT<=0){P.pushT=.3;P.vx+=ix*sp*.9;P.vy+=iy*sp*.9;P.kick=.34;S.push();}
       const k=1-Math.exp(-3*dt);P.vx+=(ix*spd-P.vx)*k;P.vy+=(iy*spd-P.vy)*k;
     }else{
-      const k=1-Math.exp(-(air?.9:2.4)*dt);P.vx+=(ix*sp-P.vx)*k;P.vy+=(iy*sp-P.vy)*k;
+      const k=1-Math.exp(-(air?.9:P.onRamp?4:3)*dt);P.vx+=(ix*sp-P.vx)*k;P.vy+=(iy*sp-P.vy)*k;
     }
   }else if(!air){
-    const f=Math.exp(-(P.onRamp?.35:.9)*dt);P.vx*=f;P.vy*=f;if(spd<6)P.vx=P.vy=0;
+    const f=Math.exp(-(P.onRamp?.25:.6)*dt);P.vx*=f;P.vy*=f;if(spd<6)P.vx=P.vy=0;
   }
   spd=Math.hypot(P.vx,P.vy);
   if(!air&&spd>sp*1.25){const f=Math.exp(-1.5*dt);P.vx*=f;P.vy*=f;spd*=f;}
@@ -767,6 +789,7 @@ function skate(dt,ix,iy,sp,moving){
   const dc=Math.exp(-3*dt);P.ex*=dc;P.ey*=dc;
   P.kick=Math.max(0,P.kick-dt);
   P.speedNow=spd;P.maxSp=sp;P.moving=spd>25||P.kick>0;P.walk+=dt*spd/190;
+  if(P.winT>0)P.winT-=dt;
   const tk=P.trick;
   if(tk){
     tk.t+=dt;
@@ -788,27 +811,29 @@ function skate(dt,ix,iy,sp,moving){
       S.trick();P.trick=null;
     }
   }
-  const rp=rampAt(P.x,P.y);
+  let rp=rampAt(P.x,P.y);
+  if(rp&&!P.onRamp&&rp.h>P.z+14)rp=null; // can't hop onto a ramp or wall from the side
   if(P.z>0||P.vz>0||rp||P.onRamp){
     const hs=rp?rp.h:0;
     P.vz-=1900*dt;P.z+=P.vz*dt;
     if(rp&&P.z<=hs){
       if(P.vz<-120)land();
+      P.rvz=(P.rvz||0)*.7+(P.onRamp?(hs-P.hsPrev)/dt:0)*.3;P.hsPrev=hs;
       P.z=hs;P.vz=0;P.onRamp=rp.r;P.rt=rp.t;P.rv=rp.v||0;
       if(rp.r.pipe){ // gravity slides you back down the wall toward the flat bottom
         const d=DIRS[rp.r.dir],s=Math.sign(rp.v)*Math.max(0,Math.abs(rp.v)-.35);
-        P.vx-=-d[1]*s*750*dt;P.vy-=d[0]*s*750*dt;
+        P.vx-=-d[1]*s*380*dt;P.vy-=d[0]*s*380*dt;
       }
     }else if(P.onRamp&&!rp){
       const d=DIRS[P.onRamp.dir];
       if(P.onRamp.pipe){
         if(P.rt>.7){
           const sg=Math.sign(P.rv)||1;
-          P.vz=450+200*Math.min(1,(P.rt-.7)/.3);P.vx+=-d[1]*sg*260;P.vy+=d[0]*sg*260;bump();S.jump();
+          P.vz=Math.max(380,Math.min(850,P.rvz+160));P.vx+=-d[1]*sg*120;P.vy+=d[0]*sg*120;launchBoost();bump();S.jump();
           popL(P.x,P.y,P.z+120,'AIR x'+P.chain,'#7dd3ff',24);
         }
       }else if(P.rt>.6){
-        P.vz=420+380*P.rt;P.vx+=d[0]*320;P.vy+=d[1]*320;bump();S.jump();
+        P.vz=Math.max(330,Math.min(800,330+P.rvz*3));P.vx+=d[0]*180;P.vy+=d[1]*180;launchBoost();bump();S.jump();
         popL(P.x,P.y,P.z+120,'LAUNCH x'+P.chain,'#ffb02e',24);
       }
       P.onRamp=null;
@@ -1043,7 +1068,7 @@ function drawPlayer(px,py){
   const air=P.z>8,lift=P.z+(P.grind?16:0),tk=P.trick,pr=tk?tk.t/tk.dur:0;
   let sxm=f*(1+.04*bob);
   if(tk&&tk.type==='spin'){const c=Math.cos(pr*TAU);sxm*=(c<0?-1:1)*Math.max(.12,Math.abs(c));}
-  tf(px,py-lift-(mv&&!air&&!P.grind?Math.abs(bob)*3:0),dead?G.deadT*9:(mv?Math.sin(P.walk*7)*.05:0)+(P.grind?-.08*f:0)+(tk&&tk.type==='back'?-f*pr*TAU:0),sxm,1-.04*bob);
+  tf(px,py-lift-(mv&&!air&&!P.grind?Math.abs(bob)*3:0),dead?G.deadT*9:(mv?Math.sin(P.walk*7)*.05:0)+(P.grind?-.08*f:0)+(tk&&tk.type==='back'?-f*pr*TAU:0)+(P.stun>0?f*1.45:0),sxm,1-.04*bob);
   ctx.lineCap='round';ctx.lineJoin='round';
   // skateboard (kickflip rotates it around its long axis)
   ctx.save();
