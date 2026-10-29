@@ -869,8 +869,9 @@ function update(dt){
   }
   // keys are screen directions; convert to a ground-plane direction (iso view)
   let wx=0,wy=0;
-  if(moving){const[ax,ay]=s2w(ix,iy),l=Math.hypot(ax,ay)||1;wx=ax/l;wy=ay/l;}
-  skate(dt,wx,wy,sp,moving);
+  let dirMul=1; // the iso view foreshortens up/down and diagonals; speed up the ground-plane speed so every direction feels equally fast on screen
+  if(moving){const[ax,ay]=s2w(ix,iy),l=Math.hypot(ax,ay)||1;wx=ax/l;wy=ay/l;dirMul=Math.min(1.8,l);}
+  skate(dt,wx,wy,sp*dirMul,moving);
   P.inv=Math.max(0,P.inv-dt);
   spawning(dt);
 
