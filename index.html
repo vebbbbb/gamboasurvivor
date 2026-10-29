@@ -36,7 +36,7 @@ button:hover{background:#fff27a}
   <div id="face" class="face">🙂</div>
   <h1 id="nameTitle">[NAME]</h1>
   <div class="blink">PRESS SPACE TO SURVIVE THE WORKDAY</div>
-  <div class="hint">WASD / Arrows to move. Hold a direction to kick off and roll (kick again if you slow down). SPACE = jump; in the air Z = kickflip, X = 360, Z+X together = BACKFLIP. Land tricks for a shockwave. Halfpipes and ramps launch you, but tap SPACE right at the lip for a PERFECT POP (a much bigger jump). Ride up ramps to launch, land on rails to grind. Chain tricks, grinds and launches for a STYLE multiplier: more damage and speed until you stop. Attacks are automatic. Collect coffee beans, grab White Monsters for a rush, and beat a boss every 2 minutes to unlock synergy evolutions. M = mute, P = pause.</div>
+  <div class="hint">WASD / Arrows to move. Hold a direction to kick off and roll (kick again if you slow down). SPACE = jump (hold for a full ollie, tap for a hop; tap just before landing to bunny-hop); hold C or Shift on the ground for a manual; in the air Z = kickflip, X = 360, Z+X together = BACKFLIP. Land tricks for a shockwave. Halfpipes and ramps launch you, but tap SPACE right at the lip for a PERFECT POP (a much bigger jump). Ride up ramps to launch, land on rails to grind. Chain tricks, grinds and launches for a STYLE multiplier: more damage and speed until you stop. Attacks are automatic. Collect coffee beans, grab White Monsters for a rush, and beat a boss every 2 minutes to unlock synergy evolutions. M = mute, P = pause.</div>
   <input id="nameIn" maxlength="16" placeholder="Type your name…" autocomplete="off" spellcheck="false">
   <div class="hint">Type a name, then press Enter to start.</div>
 </div>
@@ -83,10 +83,24 @@ nameIn.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.
 applyName();
 
 // ---------- Audio ----------
-let actx=null,muted=false;
+let actx=null,muted=false,rollG=null,rollF=null;
 function ensureAudio(){
   if(!actx){try{actx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}
   if(actx&&actx.state==='suspended')actx.resume();
+  initRoll();
+}
+function initRoll(){
+  if(rollG||!actx)return;
+  const n=actx.sampleRate|0,b=actx.createBuffer(1,n,actx.sampleRate),d=b.getChannelData(0);
+  for(let i=0;i<n;i++)d[i]=Math.random()*2-1;
+  const s=actx.createBufferSource();s.buffer=b;s.loop=true;
+  rollF=actx.createBiquadFilter();rollF.type='lowpass';rollF.frequency.value=500;
+  rollG=actx.createGain();rollG.gain.value=0;
+  s.connect(rollF);rollF.connect(rollG);rollG.connect(actx.destination);s.start();
+}
+function updRoll(v,f){
+  if(!rollG)return;
+  const t=actx.currentTime;rollG.gain.setTargetAtTime(muted?0:v,t,.06);rollF.frequency.setTargetAtTime(f,t,.06);
 }
 function tone(f,dur,type='square',vol=0.08,slide=0,delay=0){
   if(!actx||muted)return;
@@ -121,6 +135,7 @@ const S={
   },
   nuke:()=>{tone(110,.7,'sawtooth',.2,-80);tone(70,.8,'square',.15,-40,.05);S.monster();},
   jump:()=>tone(260,.15,'sine',.1,500),
+  clack:()=>tone(140,.05,'square',.05,-60),
   push:()=>sfx('push',120,()=>tone(170,.06,'triangle',.07,-60)),
   trick:()=>{tone(700,.06,'square',.06);tone(1000,.08,'square',.06,0,.06);},
   land:()=>tone(90,.12,'triangle',.15,-40),
@@ -388,7 +403,7 @@ function reset(){
     lv:{coffee:1,keyboard:0,nova:0,stapler:0,undo:0,speed:0,pickup:0,dmg:0,atk:0},
     cd:{coffee:.3,nova:2,stapler:1,undo:8}};
   enemies=[];gems=[];projs=[];pops=[];parts=[];novas=[];hrings=[];
-  G={time:0,kills:0,level:1,xp:0,nextBoss:120,boss:null,spawnAcc:0,swarmT:40,shake:0,flash:0,banner:null,t:0,idc:1,deadT:0,overShown:false};
+  G={time:0,kills:0,level:1,xp:0,nextBoss:120,boss:null,spawnAcc:0,swarmT:40,shake:0,flash:0,camX:0,camY:0,zm:1,banner:null,t:0,idc:1,deadT:0,overShown:false};
 }
 reset();
 const chainDmg=()=>1+Math.min(1.5,.15*P.chain),chainSpd=()=>1+Math.min(.5,.05*P.chain);
@@ -429,7 +444,7 @@ function spawnEnemy(type,x,y,boss){
 // A point just off-screen (in screen space), converted back to the ground plane.
 function ringPos(a){
   if(a===undefined)a=Math.random()*TAU;
-  const[dx,dy]=s2w(Math.cos(a)*(W/2+70),Math.sin(a)*(H/2+70));
+  const[dx,dy]=s2w((G.camX||0)+Math.cos(a)*(W/2+110),(G.camY||0)+Math.sin(a)*(H/2+110));
   return[P.x+dx,P.y+dy];
 }
 function pickType(){
@@ -714,9 +729,10 @@ function land(){
   if(n>0){
     novas.push({id:G.idc++,x:P.x,y:P.y,r:10,maxR:110+30*n+8*P.chain,dmg:(16+8*n)*dmgM(),txt:'SICK!!'});
     G.xp+=n*2;banner('NAILED IT! CHAIN x'+P.chain,'#ffe14d');shake(7);S.trick();
-    P.chainT=3;
+    P.chainT=3;P.vx*=1.12;P.vy*=1.12; // clean landing keeps the flow going
   }
-  P.tricksDone=0;P.trick=null;P.winT=0;
+  P.tricksDone=0;P.trick=null;P.winT=0;P.sq=.14;
+  if(P.jumpBuf>0&&!(P.stun>0)){P.jumpBuf=0;P.vz=keys.jump?720:380;P.jumpCut=!!keys.jump;P.z=.01;S.jump();popL(P.x,P.y,P.z+90,'BUNNY HOP','#bde4ff',18);}
 }
 // Ramps and halfpipes kick you into the air by themselves; pressing SPACE right at the lip gives a much bigger PERFECT POP.
 function launchBoost(){
@@ -735,8 +751,9 @@ function jump(){
     if(!r.pipe){P.vx+=d[0]*120;P.vy+=d[1]*120;}
     P.onRamp=null;P.z+=.01;S.jump();return;
   }
-  if(P.z<=0&&P.vz<=0){P.vz=640;P.z+=.01;S.jump();return;}
-  if(P.winT>0&&!P.grind){P.winT=0;P.vz+=380;bump();popL(P.x,P.y,P.z+150,'LATE POP! x'+P.chain,'#7ee081',24);S.trick();}
+  if(P.z<=0&&P.vz<=0){P.vz=720;P.jumpCut=true;P.z+=.01;S.jump();S.clack();return;} // hold SPACE for a full ollie, tap for a hop
+  if(P.winT>0&&!P.grind){P.winT=0;P.vz+=380;bump();popL(P.x,P.y,P.z+150,'LATE POP! x'+P.chain,'#7ee081',24);S.trick();return;}
+  P.jumpBuf=.14; // pressed just before landing: you'll bunny-hop straight out of it
 }
 function trick(type){
   if(state!=='play'||P.grind||P.z<18||P.stun>0)return;
@@ -752,7 +769,7 @@ function skate(dt,ix,iy,sp,moving){
   if(g){
     const r=g.r,L=Math.hypot(r.bx-r.ax,r.by-r.ay),ux=(r.bx-r.ax)/L,uy=(r.by-r.ay)/L;
     g.s+=g.dir*dt*(430+60*P.lv.speed);
-    P.x=r.ax+ux*g.s;P.y=r.ay+uy*g.s;P.moving=true;P.walk+=dt*2;P.face=ux*g.dir>=0?1:-1;
+    P.x=r.ax+ux*g.s;P.y=r.ay+uy*g.s;P.moving=true;P.walk+=dt*2;P.face=ux*g.dir>=0?1:-1;P.vx=ux*g.dir*430;P.vy=uy*g.dir*430;P.speedNow=430;
     parts.push({x:P.x-ux*g.dir*10,y:P.y+44,vx:rnd(-90,90)-ux*g.dir*120,vy:rnd(-140,-20),life:.35,max:.35,c:pick(['#ffd23f','#ff8a3c','#fff']),s:4});
     S.grindTick();
     g.hit-=dt;
@@ -771,11 +788,11 @@ function skate(dt,ix,iy,sp,moving){
   if(P.stun>0){P.stun-=dt;P.vx=P.vy=0;P.ex=P.ey=0;P.moving=false;P.kick=0;return;}
   // momentum skating: kick off the ground to get rolling, carve once you have speed, coast when idle
   const air=P.z>2&&!P.onRamp;
-  let spd=Math.hypot(P.vx,P.vy);
+  let spd=Math.hypot(P.vx,P.vy),carve=0;
   if(moving){
     if(spd>8){ // carving turns your heading but keeps your speed
       const ang=Math.atan2(P.vy,P.vx);let da=Math.atan2(iy,ix)-ang;da=Math.atan2(Math.sin(da),Math.cos(da));
-      const mt=(air?1.6:P.onRamp?3:6.5)*dt,na=ang+Math.max(-mt,Math.min(mt,da));
+      const mt=(air?1.6:P.onRamp?3:6.5)*(keys.manual?.55:1)*dt,ta=Math.max(-mt,Math.min(mt,da)),na=ang+ta;carve=Math.min(1,Math.abs(ta)/(6.5*dt));
       P.vx=Math.cos(na)*spd;P.vy=Math.sin(na)*spd;
     }
     if(!air&&spd<sp*.8){
@@ -790,11 +807,16 @@ function skate(dt,ix,iy,sp,moving){
   }
   spd=Math.hypot(P.vx,P.vy);
   if(!air&&spd>sp*1.3){const f=Math.exp(-1.5*dt);P.vx*=f;P.vy*=f;spd*=f;}
+  P.carve=(P.carve||0)+(carve-(P.carve||0))*(1-Math.exp(-8*dt));
+  if(!air&&carve>.5&&spd>sp*.5&&Math.random()<.5)parts.push({x:P.x,y:P.y,vx:rnd(-40,40),vy:rnd(-70,-10),life:.3,max:.3,c:pick(['#ddd','#ffd23f','#fff']),s:3});
+  P.manual=!!keys.manual&&!air&&spd>90&&!(P.stun>0)&&!P.onRamp; // manual: ride on the back wheels to keep the chain alive
+  if(P.manual){P.manT=(P.manT||0)+dt;P.chainT=3;const mf=Math.exp(-.35*dt);P.vx*=mf;P.vy*=mf;if(P.manT>1.1){P.manT=0;bump();popL(P.x,P.y,100,'MANUAL x'+P.chain,'#7dd3ff',22);S.trick();}}else P.manT=0;
   P.x+=(P.vx+P.ex)*dt;P.y+=(P.vy+P.ey)*dt;
+  {const vsx=(P.vx-P.vy)*IX;if(Math.abs(vsx)>40)P.face=vsx>0?1:-1;}
   const dc=Math.exp(-3*dt);P.ex*=dc;P.ey*=dc;
   P.kick=Math.max(0,P.kick-dt);
   P.speedNow=spd;P.maxSp=sp;P.moving=spd>25||P.kick>0;P.walk+=dt*spd/190;
-  if(P.winT>0)P.winT-=dt;
+  if(P.winT>0)P.winT-=dt;if(P.jumpBuf>0)P.jumpBuf-=dt;P.sq=Math.max(0,(P.sq||0)-dt*.6);
   const tk=P.trick;
   if(tk){
     tk.t+=dt;
@@ -872,6 +894,12 @@ function update(dt){
   let dirMul=1; // the iso view foreshortens up/down and diagonals; speed up the ground-plane speed so every direction feels equally fast on screen
   if(moving){const[ax,ay]=s2w(ix,iy),l=Math.hypot(ax,ay)||1;wx=ax/l;wy=ay/l;dirMul=Math.min(1.8,l);}
   skate(dt,wx,wy,sp*dirMul,moving);
+  { // camera leads the direction of travel, zooms out with speed; wheel roar follows speed
+    const vsx=(P.vx-P.vy)*IX,vsy=(P.vx+P.vy)*IY,kc=1-Math.exp(-4*dt),spN=P.speedNow||0,top=P.maxSp||300;
+    G.camX+=(Math.max(-140,Math.min(140,vsx*.28))-G.camX)*kc;G.camY+=(Math.max(-90,Math.min(90,vsy*.28))-G.camY)*kc;
+    G.zm+=((1-.05*Math.min(1,spN/(top*1.2)))-G.zm)*(1-Math.exp(-3*dt));
+    updRoll(P.grind?.09:(P.z<=0&&!P.stun?Math.min(.07,spN/top*.07):0),300+spN*2.2);
+  }
   P.inv=Math.max(0,P.inv-dt);
   spawning(dt);
 
@@ -1025,12 +1053,12 @@ function showOver(){
 }
 $('restart').addEventListener('click',e=>{e.target.blur();startGame();});
 
-const KEYMAP={KeyW:'up',ArrowUp:'up',KeyS:'down',ArrowDown:'down',KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right'};
+const KEYMAP={KeyW:'up',ArrowUp:'up',KeyS:'down',ArrowDown:'down',KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right',KeyC:'manual',ShiftLeft:'manual',ShiftRight:'manual'};
 addEventListener('keydown',e=>{
   ensureAudio();
   if(KEYMAP[e.code]){keys[KEYMAP[e.code]]=true;e.preventDefault();}
   if(e.code==='Space'){
-    e.preventDefault();
+    e.preventDefault();keys.jump=true;
     if(state==='start')startGame();
     else if(state==='dead'&&G.overShown&&G.deadT>1.5)startGame();
     else if(state==='play'&&!paused&&!e.repeat)jump();
@@ -1044,15 +1072,19 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyM')setMute(!muted);
   if(e.code==='KeyP'&&state==='play')paused=!paused;
 });
-addEventListener('keyup',e=>{if(KEYMAP[e.code])keys[KEYMAP[e.code]]=false;});
+addEventListener('keyup',e=>{
+  if(KEYMAP[e.code])keys[KEYMAP[e.code]]=false;
+  if(e.code==='Space'){keys.jump=false;if(P.jumpCut&&P.vz>260)P.vz*=.45;P.jumpCut=false;} // let go early = shorter hop
+});
 addEventListener('blur',()=>{if(state==='play')paused=true;for(const k in keys)keys[k]=false;});
 
 // ---------- Render ----------
+let ZM=1,ZOX=0,ZOY=0; // speed zoom: the whole world pulls back a touch when you're flying
 function tf(x,y,rot,sx,sy){
-  const c=Math.cos(rot),s=Math.sin(rot);
-  ctx.setTransform(DPR*c*sx,DPR*s*sx,-DPR*s*sy,DPR*c*sy,x*DPR,y*DPR);
+  const c=Math.cos(rot),s=Math.sin(rot),z=DPR*ZM;
+  ctx.setTransform(z*c*sx,z*s*sx,-z*s*sy,z*c*sy,(x*ZM+ZOX)*DPR,(y*ZM+ZOY)*DPR);
 }
-function base(){ctx.setTransform(DPR,0,0,DPR,0,0);}
+function base(){ctx.setTransform(DPR*ZM,0,0,DPR*ZM,ZOX*DPR,ZOY*DPR);}
 function txt(t,x,y,size,fill,align){
   ctx.font='bold '+size+'px "Comic Sans MS","Chalkboard SE",cursive,sans-serif';
   ctx.textAlign=align||'center';ctx.lineWidth=Math.max(3,size/6);ctx.strokeStyle='#000';ctx.lineJoin='round';
@@ -1074,7 +1106,7 @@ function drawPlayer(px,py){
   const air=P.z>8,lift=P.z+(P.grind?16:0),tk=P.trick,pr=tk?tk.t/tk.dur:0;
   let sxm=f*(1+.04*bob);
   if(tk&&tk.type==='spin'){const c=Math.cos(pr*TAU);sxm*=(c<0?-1:1)*Math.max(.12,Math.abs(c));}
-  tf(px,py-lift-(mv&&!air&&!P.grind?Math.abs(bob)*3:0),dead?G.deadT*9:(mv?Math.sin(P.walk*7)*.05:0)+(P.grind?-.08*f:0)+(tk&&tk.type==='back'?-f*pr*TAU:0)+(P.stun>0?f*1.45:0),sxm,1-.04*bob);
+  tf(px,py-lift-(mv&&!air&&!P.grind?Math.abs(bob)*3:0),dead?G.deadT*9:(mv?Math.sin(P.walk*7)*.05:0)+(P.grind?-.08*f:0)+(tk&&tk.type==='back'?-f*pr*TAU:0)+(P.stun>0?f*1.45:0)+(P.manual?-f*.32:0)-f*Math.max(-.22,Math.min(.22,P.vz/3200)),sxm,1-.04*bob-1.2*(P.sq||0)-.05*(P.carve||0));
   ctx.lineCap='round';ctx.lineJoin='round';
   // skateboard (kickflip rotates it around its long axis)
   ctx.save();
@@ -1172,9 +1204,10 @@ function drawEnemy(e){
   base();
 }
 function render(){
+  ZM=G.zm||1;ZOX=W/2*(1-ZM);ZOY=H/2*(1-ZM);
   base();
   const shk=G.shake;
-  const cx=pX(P.x,P.y)-W/2+(Math.random()-.5)*shk*2,cy=pY(P.x,P.y)-H/2+(Math.random()-.5)*shk*2;
+  const cx=pX(P.x,P.y)-W/2+(G.camX||0)+(Math.random()-.5)*shk*2,cy=pY(P.x,P.y)-H/2+(G.camY||0)+(Math.random()-.5)*shk*2;
   // isometric carpet tiles
   ctx.save();ctx.translate((((-cx)%128)+128)%128-128,(((-cy)%64)+64)%64-64);
   ctx.fillStyle=isoPat;ctx.fillRect(0,0,W+256,H+128);ctx.restore();
@@ -1189,7 +1222,7 @@ function render(){
 
   // gems
   for(const g of gems){
-    const x=pX(g.x,g.y)-cx,y=pY(g.x,g.y)-cy-10;if(x<-40||y<-40||x>W+40||y>H+40)continue;
+    const x=pX(g.x,g.y)-cx,y=pY(g.x,g.y)-cy-10;if(x<-100||y<-100||x>W+100||y>H+100)continue;
     if(g.k==='monster'){
       const by=Math.sin(G.t*5+g.x)*3;
       ctx.fillStyle='rgba(255,255,255,'+(.2+.1*Math.sin(G.t*8))+')';ctx.beginPath();ctx.arc(x,y+by,24,0,TAU);ctx.fill();
@@ -1220,7 +1253,7 @@ function render(){
   visBuf.length=0;
   for(const e of enemies){
     const x=pX(e.x,e.y)-cx,y=pY(e.x,e.y)-cy,m=e.sp.d;
-    if(x<-m||y<-m||x>W+m||y>H+m*1.5)continue;
+    if(x<-m-80||y<-m-80||x>W+m+80||y>H+m*1.5+80)continue;
     e.sx=x;e.sy=y;visBuf.push(e);
   }
   visBuf.sort((a,b)=>(a.x+a.y)-(b.x+b.y));
@@ -1266,6 +1299,17 @@ function render(){
     txt(p.txt,pX(p.x,p.y)-cx,pY(p.x,p.y)-cy-(p.lift||0)-40+(p.oy||0),p.size*(1+Math.max(0,p.life/p.max-.7)),p.col);
   }
   ctx.globalAlpha=1;
+  ZM=1;ZOX=0;ZOY=0;base();
+  const sf=Math.max(0,Math.min(1,((P.speedNow||0)/(P.maxSp||300)-.75)/.6));
+  if(sf>0&&state==='play'){ // speed lines
+    const vsx=(P.vx-P.vy)*IX,vsy=(P.vx+P.vy)*IY,vl=Math.hypot(vsx,vsy)||1,ux=vsx/vl,uy=vsy/vl;
+    ctx.strokeStyle='rgba(255,255,255,'+(.22*sf)+')';ctx.lineWidth=2;ctx.lineCap='round';
+    for(let i=0;i<16;i++){
+      const x=Math.random()*W,y=Math.random()*H,l=50+Math.random()*110*sf;
+      if(Math.hypot(x-W/2,y-H/2)<Math.min(W,H)*.28)continue;
+      ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-ux*l,y-uy*l);ctx.stroke();
+    }
+  }
   if(P.hp<30&&state!=='start'){
     const g=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*.35,W/2,H/2,Math.max(W,H)*.7);
     g.addColorStop(0,'rgba(255,0,0,0)');g.addColorStop(1,'rgba(255,0,0,'+(.25+.15*Math.sin(G.t*8))+')');
@@ -1305,6 +1349,7 @@ function drawHUD(){
     const sp=sprite(UPG[id].icon,28);ctx.drawImage(sp.n,x,H-62,sp.d,sp.d);
     txt(P.evo[id]?'★':String(P.lv[id]),x+sp.d-4,H-18,16,P.evo[id]?'#ff8a3c':(P.lv[id]>=5?'#ffe14d':'#fff'));x+=sp.d+10;
   }
+  if(state==='play'){const sf2=Math.min(1.4,(P.speedNow||0)/(P.maxSp||300));bar(W/2-100,H-30,200,10,sf2/1.4,sf2>1?'#ffb02e':'#7dd3ff','#223');txt('SPEED',W/2,H-36,14,'#fff');}
   if(G.banner&&G.banner.t>0){
     const b=G.banner,a=Math.min(1,b.t),sc=1+Math.max(0,b.t-2)*2;
     ctx.globalAlpha=a;txt(b.txt,W/2,H*.27,Math.min(56,W/12)*sc,b.col);ctx.globalAlpha=1;
@@ -1332,6 +1377,7 @@ function frame(now){
     G.flash=Math.max(0,G.flash-dt*1.5);
   }
   if(P.spin>0)P.spin=Math.max(0,P.spin-dt);
+  if(state!=='play'||paused)updRoll(0,300);
   render();
   requestAnimationFrame(frame);
 }
