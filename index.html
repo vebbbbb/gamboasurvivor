@@ -26,7 +26,8 @@ button:hover{background:#fff27a}
 #mute{position:fixed;right:12px;bottom:12px;z-index:9;font-size:22px;padding:4px 12px}
 #review{font-size:clamp(16px,2.4vw,24px);max-width:640px;margin:10px 0 16px;font-style:italic;color:#ffe14d}
 #stats{font-size:22px;line-height:1.5}
-label.pick{margin-top:8px;font-size:13px;opacity:.7;cursor:pointer;text-decoration:underline}
+#nameIn{font:inherit;font-size:22px;text-align:center;padding:8px 14px;margin:10px 0 6px;border-radius:10px;border:3px solid #000;background:#fff;color:#111;width:260px;outline:none}
+#nameIn:focus{box-shadow:0 0 0 4px #ffe14d}
 </style>
 </head>
 <body>
@@ -36,7 +37,8 @@ label.pick{margin-top:8px;font-size:13px;opacity:.7;cursor:pointer;text-decorati
   <h1 id="nameTitle">[NAME]</h1>
   <div class="blink">PRESS SPACE TO SURVIVE THE WORKDAY</div>
   <div class="hint">WASD / Arrows to move. Attacks are automatic. Collect coffee beans, grab White Monsters for a rush, and avoid the Steering Committee. M = mute, P = pause.</div>
-  <label class="pick">Change photo… <input id="photoIn" type="file" accept="image/*" style="display:none"></label>
+  <input id="nameIn" maxlength="16" placeholder="Type your name…" autocomplete="off" spellcheck="false">
+  <div class="hint">Type a name, then press Enter to start.</div>
 </div>
 <div id="levelup" class="overlay">
   <h1>LEVEL UP! 🎉</h1>
@@ -54,8 +56,8 @@ label.pick{margin-top:8px;font-size:13px;opacity:.7;cursor:pointer;text-decorati
 <script>
 (()=>{
 'use strict';
-const PLAYER_NAME='[NAME]';
-// Photo: looks for colleague.png / colleague.jpg next to this file, or a photo picked on the start screen.
+let PLAYER_NAME='Employee';
+// Photo: loaded from colleague.png / colleague.jpg next to this file.
 const PHOTO_CANDIDATES=['colleague.png','colleague.jpg','colleague.jpeg','1.png'];
 
 const cv=document.getElementById('c'),ctx=cv.getContext('2d');
@@ -66,7 +68,15 @@ const TAU=Math.PI*2;
 const rnd=(a,b)=>a+Math.random()*(b-a);
 const pick=a=>a[(Math.random()*a.length)|0];
 const $=id=>document.getElementById(id);
-document.getElementById('nameTitle').textContent=PLAYER_NAME;
+const nameIn=$('nameIn');
+try{const s=localStorage.getItem('survivorsName');if(s)nameIn.value=s;}catch(e){}
+function applyName(){
+  const v=nameIn.value.trim();PLAYER_NAME=v||'Employee';$('nameTitle').textContent=PLAYER_NAME;
+  try{localStorage.setItem('survivorsName',v);}catch(e){}
+}
+nameIn.addEventListener('input',applyName);
+nameIn.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();startGame();}});
+applyName();
 
 // ---------- Audio ----------
 let actx=null,muted=false;
@@ -105,6 +115,7 @@ const S={
     hp.type='highpass';hp.frequency.value=3000;g.gain.value=.25;s.buffer=b;s.connect(hp);hp.connect(g);g.connect(actx.destination);s.start();
     [392,523,659,784,1047].forEach((f,i)=>tone(f,.1,'square',.07,0,.3+i*.06));
   },
+  nuke:()=>{tone(110,.7,'sawtooth',.2,-80);tone(70,.8,'square',.15,-40,.05);S.monster();},
   trombone:()=>{
     if(!actx||muted)return;
     let t=actx.currentTime+.05;
@@ -197,8 +208,6 @@ function setPhoto(src){
 }
 playerSpr=buildPlayerSprite(null);
 (function loadPhoto(){
-  let saved=null;try{saved=localStorage.getItem('survivorsPhoto');}catch(e){}
-  if(saved){setPhoto(saved);return;}
   let i=0;
   const tryNext=()=>{
     if(i>=PHOTO_CANDIDATES.length)return;
@@ -207,12 +216,6 @@ playerSpr=buildPlayerSprite(null);
   };
   tryNext();
 })();
-$('photoIn').addEventListener('change',e=>{
-  const f=e.target.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=()=>{setPhoto(r.result);try{localStorage.setItem('survivorsPhoto',r.result);}catch(err){}};
-  r.readAsDataURL(f);
-});
 
 // ---------- Data ----------
 const ETYPES=[
@@ -225,6 +228,8 @@ const ETYPES=[
   {id:'clipboard',emoji:'📋',size:40,hp:85,spd:38,dmg:12,xp:7,minT:130,w:1,wob:.4,col:['#ddd','#c98a55','#fff'],quip:['TPS REPORT?!','Status update?']},
 ];
 const BOSS_TYPE={id:'boss',emoji:'🗓️',size:150,hp:1500,spd:52,dmg:18,xp:4,wob:.15,col:['#fff','#ff6b6b','#ffe66b']};
+const DROPS=[['monster',.012],['nuke',.004],['speed',.007],['atk',.007],['magnet',.008],['pizza',.008]];
+const PW={nuke:['🚨','#ff5a3c'],speed:['🚀','#4fc3ff'],atk:['🔥','#ffb02e'],magnet:['🧲','#c77dff']};
 const KILL_QUIPS=['Descoped','Moved to next sprint',"Won't fix",'Closed as duplicate','Resolved','LGTM','Blocker removed','Actioned'];
 const UPG={
   coffee:{name:'Coffee Splash',icon:'☕',lines:[
@@ -287,14 +292,15 @@ const REVIEWS=[
 let state='start',paused=false,P,G,enemies,gems,projs,pops,parts,novas,choices=[];
 const keys={};
 function reset(){
-  P={x:0,y:0,hp:100,max:100,r:24,inv:0,spin:0,walk:0,idle:0,kb:[],kbAng:0,buff:0,face:1,
+  P={x:0,y:0,hp:100,max:100,r:24,inv:0,spin:0,walk:0,idle:0,kb:[],kbAng:0,buff:0,tSpeed:0,tAtk:0,face:1,
     lv:{coffee:1,keyboard:0,nova:0,stapler:0,undo:0,speed:0,pickup:0,dmg:0,atk:0},
     cd:{coffee:.3,nova:2,stapler:1,undo:8}};
   enemies=[];gems=[];projs=[];pops=[];parts=[];novas=[];
-  G={time:0,kills:0,level:1,xp:0,nextBoss:180,boss:null,spawnAcc:0,swarmT:40,shake:0,banner:null,t:0,idc:1,deadT:0,overShown:false};
+  G={time:0,kills:0,level:1,xp:0,nextBoss:180,boss:null,spawnAcc:0,swarmT:40,shake:0,flash:0,banner:null,t:0,idc:1,deadT:0,overShown:false};
 }
 reset();
-const dmgM=()=>1+.2*P.lv.dmg,atkM=()=>(1+.15*P.lv.atk)*(P.buff>0?1.5:1);
+const dmgM=()=>1+.2*P.lv.dmg,atkM=()=>(1+.15*P.lv.atk)*Math.max(P.buff>0?1.5:1,P.tAtk>0?2.5:1);
+const spdBuff=()=>Math.max(P.buff>0?1.5:1,P.tSpeed>0?2.3:1);
 const xpNeed=()=>Math.floor(5+G.level*3+G.level*G.level*.35);
 
 // ---------- Spatial grid (separation) ----------
@@ -362,7 +368,7 @@ function hurtEnemy(e,dmg,kx,ky,crit0){
   if(e.t.id==='clipboard'&&e.quipT<=G.time){e.quipT=G.time+2;pop(e.x,e.y-e.r-18,'TPS REPORT?!','#ffb0b0',16);}
   if(e.hp<=0)killEnemy(e);
 }
-function killEnemy(e){
+function killEnemy(e,nuke){
   e.dead=true;G.kills++;
   burst(e.x,e.y,e.boss?70:9,e.t.col,e.boss?400:220,e.boss?10:5);
   S.pop();
@@ -372,11 +378,14 @@ function killEnemy(e){
     pop(e.x,e.y-100,'THIS COULD HAVE BEEN AN EMAIL','#7ee081',28);
     banner('MEETING ADJOURNED','#7ee081');S.honk();shake(14);
     P.hp=Math.min(P.max,P.hp+25);G.boss=null;
+  }else if(nuke){
+    G.xp+=e.xp;
   }else{
     if(gems.length>400){const g=gems.splice(0,1)[0];if(g.k==='bean')G.xp+=g.v;}
     const dr=Math.random();
-    if(dr<.012)gems.push({x:e.x,y:e.y,v:0,mag:false,k:'monster'});
-    else if(dr<.02)gems.push({x:e.x,y:e.y,v:0,mag:false,k:'pizza'});
+    let kind=null,acc=0;
+    for(const d of DROPS){acc+=d[1];if(dr<acc){kind=d[0];break;}}
+    if(kind)gems.push({x:e.x,y:e.y,v:0,mag:false,k:kind});
     else gems.push({x:e.x+rnd(-8,8),y:e.y+rnd(-8,8),v:e.xp,mag:false,k:'bean'});
     if(e.t.quip&&Math.random()<.04)pop(e.x,e.y-e.r,pick(e.t.quip),'#ffdede',15);
     else if(Math.random()<.02)pop(e.x,e.y-e.r,pick(KILL_QUIPS),'#bde4ff',15);
@@ -506,10 +515,10 @@ function update(dt){
   let ix=(keys.right?1:0)-(keys.left?1:0),iy=(keys.down?1:0)-(keys.up?1:0);
   const moving=!!(ix||iy);
   if(moving){const l=Math.hypot(ix,iy);ix/=l;iy/=l;}
-  const sp=190*(1+.12*P.lv.speed)*(P.buff>0?1.5:1);
+  const sp=190*(1+.12*P.lv.speed)*spdBuff();
   if(ix)P.face=ix>0?1:-1;
-  if(P.buff>0){
-    P.buff-=dt;
+  if(P.tSpeed>0)P.tSpeed-=dt;if(P.tAtk>0)P.tAtk-=dt;if(P.buff>0)P.buff-=dt;
+  if(spdBuff()>1){
     if(moving&&Math.random()<.7)parts.push({x:P.x-ix*20,y:P.y+36,vx:rnd(-30,30),vy:rnd(-30,30),life:.4,max:.4,c:pick(['#fff','#c8ffd0','#7dff9a']),s:7});
   }
   P.x+=ix*sp*dt;P.y+=iy*sp*dt;P.moving=moving;
@@ -563,7 +572,7 @@ function update(dt){
   for(let i=gems.length-1;i>=0;i--){
     const g=gems[i],dx=P.x-g.x,dy=P.y-g.y,d=Math.hypot(dx,dy)||1;
     if(g.mag||d<pr){
-      g.mag=true;const s=(300+Math.max(0,400-d))*dt;
+      g.mag=true;const s=(g.fast?1600:300+Math.max(0,400-d))*dt;
       g.x+=dx/d*s;g.y+=dy/d*s;
     }
     if(d<P.r+8){
@@ -572,6 +581,13 @@ function update(dt){
         P.buff=12;P.hp=Math.min(P.max,P.hp+10);banner('WHITE MONSTER! ZERO SUGAR RUSH','#e8ffe8');
         pop(P.x,P.y-60,'PSSSHT! +50% SPEED','#fff',22);burst(P.x,P.y,24,['#fff','#c8ffd0','#7dff9a'],320,6);S.monster();
       }
+      else if(g.k==='nuke'){
+        banner('FIRE DRILL! EVERYONE OUT!','#ff8a5a');S.nuke();shake(16);G.flash=1;
+        for(const o of enemies){if(o.dead)continue;if(o.boss)hurtEnemy(o,o.maxhp*.3,0,0,true);else killEnemy(o,true);}
+      }
+      else if(g.k==='speed'){P.tSpeed=8;banner('TURBO SNEAKERS! SUPERSPEED','#7dd3ff');S.levelup();burst(P.x,P.y,20,['#4fc3ff','#fff'],300,6);}
+      else if(g.k==='atk'){P.tAtk=8;banner('HYPERFOCUS! SUPER ATTACK SPEED','#ffb02e');S.levelup();burst(P.x,P.y,20,['#ffb02e','#fff'],300,6);}
+      else if(g.k==='magnet'){for(const o of gems){o.mag=true;o.fast=true;}banner('MEGA MAGNET! LOOT INCOMING','#c77dff');S.levelup();}
       else{G.xp+=g.v;S.gem();}
       gems.splice(i,1);
     }
@@ -614,7 +630,7 @@ function choose(i){
 
 // ---------- Flow ----------
 function startGame(){
-  ensureAudio();reset();state='play';$('start').classList.remove('show');$('over').classList.remove('show');
+  ensureAudio();nameIn.blur();reset();state='play';$('start').classList.remove('show');$('over').classList.remove('show');
   banner('SURVIVE THE WORKDAY','#ffe14d');
 }
 function showOver(){
@@ -705,6 +721,11 @@ function render(){
       const by=Math.sin(G.t*5+g.x)*3;
       ctx.fillStyle='rgba(255,255,255,'+(.2+.1*Math.sin(G.t*8))+')';ctx.beginPath();ctx.arc(x,y+by,24,0,TAU);ctx.fill();
       ctx.drawImage(monsterCan,x-14,y-22+by,28,46);
+    }else if(PW[g.k]){
+      const by=Math.sin(G.t*5+g.x)*3,pw=PW[g.k],s=sprite(pw[0],26);
+      ctx.fillStyle=pw[1];ctx.globalAlpha=.35+.15*Math.sin(G.t*8);ctx.beginPath();ctx.arc(x,y+by,22,0,TAU);ctx.fill();ctx.globalAlpha=1;
+      ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+      ctx.drawImage(s.n,x-s.d/2,y-s.d/2+by,s.d,s.d);
     }else if(g.k==='pizza'){const s=sprite('🍕',24);ctx.drawImage(s.n,x-s.d/2,y-s.d/2+Math.sin(G.t*5+g.x)*2,s.d,s.d);}
     else{const sc=1+Math.min(g.v,8)*.06;ctx.drawImage(g.v>=4?beanG:beanN,x-8*sc,y-10*sc,16*sc,20*sc);}
   }
@@ -738,7 +759,7 @@ function render(){
   // player
   const px=P.x-cx,py=P.y-cy;
   ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(px,py+46,34,9,0,0,TAU);ctx.fill();
-  if(P.buff>0){
+  if(P.buff>0||P.tSpeed>0||P.tAtk>0){
     ctx.strokeStyle='rgba(255,255,255,'+(.4+.3*Math.sin(G.t*14))+')';ctx.lineWidth=4;
     ctx.beginPath();ctx.arc(px,py,50+Math.sin(G.t*10)*4,0,TAU);ctx.stroke();
   }
@@ -770,7 +791,10 @@ function drawHUD(){
   txt('LV '+G.level,10,13,14,'#fff','left');
   bar(16,30,240,22,P.hp/P.max,P.hp<30?'#ff3030':'#e84a4a','#411');
   txt('HP '+Math.ceil(P.hp)+'/'+P.max,136,48,16,'#fff');
-  if(P.buff>0){bar(16,62,240,12,P.buff/12,'#e8ffe8','#233');txt('WHITE MONSTER '+Math.ceil(P.buff)+'s',136,86,14,'#e8ffe8');}
+  let by=62;
+  for(const[v,mx,lab,col]of[[P.buff,12,'WHITE MONSTER','#e8ffe8'],[P.tSpeed,8,'TURBO SNEAKERS','#7dd3ff'],[P.tAtk,8,'HYPERFOCUS','#ffb02e']]){
+    if(v>0){bar(16,by,240,12,v/mx,col,'#233');txt(lab+' '+Math.ceil(v)+'s',136,by+28,14,col);by+=36;}
+  }
   const m=Math.floor(G.time/60),s=Math.floor(G.time%60);
   txt(m+':'+String(s).padStart(2,'0'),W/2,52,34,'#fff');
   txt('💀 '+G.kills,W-16,52,26,'#fff','right');
@@ -790,6 +814,7 @@ function drawHUD(){
     const b=G.banner,a=Math.min(1,b.t),sc=1+Math.max(0,b.t-2)*2;
     ctx.globalAlpha=a;txt(b.txt,W/2,H*.27,Math.min(56,W/12)*sc,b.col);ctx.globalAlpha=1;
   }
+  if(G.flash>0){ctx.fillStyle='rgba(255,255,255,'+G.flash*.85+')';ctx.fillRect(0,0,W,H);}
   if(paused){ctx.fillStyle='rgba(0,0,0,.5)';ctx.fillRect(0,0,W,H);txt('PAUSED (it\'s a meeting break)',W/2,H/2,40,'#fff');txt('press P',W/2,H/2+40,20,'#ddd');}
 }
 
@@ -809,6 +834,7 @@ function frame(now){
   if(state!=='levelup'&&!paused){
     G.shake=Math.max(0,G.shake*Math.pow(.001,dt)-dt);
     if(G.banner)G.banner.t-=dt;
+    G.flash=Math.max(0,G.flash-dt*1.5);
   }
   if(P.spin>0)P.spin=Math.max(0,P.spin-dt);
   render();
