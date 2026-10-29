@@ -773,18 +773,23 @@ function skate(dt,ix,iy,sp,moving){
   const air=P.z>2&&!P.onRamp;
   let spd=Math.hypot(P.vx,P.vy);
   if(moving){
+    if(spd>8){ // carving turns your heading but keeps your speed
+      const ang=Math.atan2(P.vy,P.vx);let da=Math.atan2(iy,ix)-ang;da=Math.atan2(Math.sin(da),Math.cos(da));
+      const mt=(air?1.6:P.onRamp?3:6.5)*dt,na=ang+Math.max(-mt,Math.min(mt,da));
+      P.vx=Math.cos(na)*spd;P.vy=Math.sin(na)*spd;
+    }
     if(!air&&spd<sp*.8){
       P.pushT-=dt;
       if(P.pushT<=0){P.pushT=.3;P.vx+=ix*sp*.9;P.vy+=iy*sp*.9;P.kick=.34;S.push();}
-      const k=1-Math.exp(-3*dt);P.vx+=(ix*spd-P.vx)*k;P.vy+=(iy*spd-P.vy)*k;
-    }else{
-      const k=1-Math.exp(-(air?.9:P.onRamp?4:3)*dt);P.vx+=(ix*sp-P.vx)*k;P.vy+=(iy*sp-P.vy)*k;
+    }else if(spd<sp){
+      const a=(sp-spd)*(1-Math.exp(-(air?.3:1.6)*dt)),nx=P.vx/(spd||1),ny=P.vy/(spd||1);
+      P.vx+=nx*a;P.vy+=ny*a;
     }
   }else if(!air){
     const f=Math.exp(-(P.onRamp?.25:.6)*dt);P.vx*=f;P.vy*=f;if(spd<6)P.vx=P.vy=0;
   }
   spd=Math.hypot(P.vx,P.vy);
-  if(!air&&spd>sp*1.25){const f=Math.exp(-1.5*dt);P.vx*=f;P.vy*=f;spd*=f;}
+  if(!air&&spd>sp*1.3){const f=Math.exp(-1.5*dt);P.vx*=f;P.vy*=f;spd*=f;}
   P.x+=(P.vx+P.ex)*dt;P.y+=(P.vy+P.ey)*dt;
   const dc=Math.exp(-3*dt);P.ex*=dc;P.ey*=dc;
   P.kick=Math.max(0,P.kick-dt);
@@ -856,7 +861,7 @@ function update(dt){
   let ix=(keys.right?1:0)-(keys.left?1:0),iy=(keys.down?1:0)-(keys.up?1:0);
   const moving=!!(ix||iy);
   if(moving){const l=Math.hypot(ix,iy);ix/=l;iy/=l;}
-  const sp=210*(1+.12*P.lv.speed)*spdBuff();
+  const sp=300*(1+.12*P.lv.speed)*spdBuff();
   if(ix)P.face=ix>0?1:-1;
   if(P.tSpeed>0)P.tSpeed-=dt;if(P.tAtk>0)P.tAtk-=dt;if(P.buff>0)P.buff-=dt;
   if(spdBuff()>1){
