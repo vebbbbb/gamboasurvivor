@@ -90,6 +90,7 @@ function ensureAudio(){
   initRoll();
 }
 function initRoll(){
+  return; // rolling-noise loop removed (it was grating)
   if(rollG||!actx)return;
   const n=actx.sampleRate|0,b=actx.createBuffer(1,n,actx.sampleRate),d=b.getChannelData(0);
   for(let i=0;i<n;i++)d[i]=Math.random()*2-1;
@@ -99,6 +100,7 @@ function initRoll(){
   s.connect(rollF);rollF.connect(rollG);rollG.connect(actx.destination);s.start();
 }
 function updRoll(v,f){
+  return;
   if(!rollG)return;
   const t=actx.currentTime;rollG.gain.setTargetAtTime(muted?0:v,t,.06);rollF.frequency.setTargetAtTime(f,t,.06);
 }
@@ -136,10 +138,10 @@ const S={
   nuke:()=>{tone(110,.7,'sawtooth',.2,-80);tone(70,.8,'square',.15,-40,.05);S.monster();},
   jump:()=>tone(260,.15,'sine',.1,500),
   clack:()=>tone(140,.05,'square',.05,-60),
-  push:()=>sfx('push',120,()=>tone(170,.06,'triangle',.07,-60)),
+  push:()=>sfx('push',200,()=>tone(170,.06,'triangle',.04,-60)),
   trick:()=>{tone(700,.06,'square',.06);tone(1000,.08,'square',.06,0,.06);},
   land:()=>tone(90,.12,'triangle',.15,-40),
-  grindTick:()=>sfx('grind',70,()=>tone(1800+Math.random()*600,.05,'sawtooth',.025)),
+  grindTick:()=>sfx('grind',150,()=>tone(700+Math.random()*250,.08,'triangle',.012)),
   trombone:()=>{
     if(!actx||muted)return;
     let t=actx.currentTime+.05;
@@ -790,17 +792,21 @@ function skate(dt,ix,iy,sp,moving){
   const air=P.z>2&&!P.onRamp;
   let spd=Math.hypot(P.vx,P.vy),carve=0;
   if(moving){
+    if(spd<=8){P.vx=ix*10;P.vy=iy*10;spd=10;} // start rolling the way you pressed
     if(spd>8){ // carving turns your heading but keeps your speed
       const ang=Math.atan2(P.vy,P.vx);let da=Math.atan2(iy,ix)-ang;da=Math.atan2(Math.sin(da),Math.cos(da));
-      const mt=(air?1.6:P.onRamp?3:6.5)*(keys.manual?.55:1)*dt,ta=Math.max(-mt,Math.min(mt,da)),na=ang+ta;carve=Math.min(1,Math.abs(ta)/(6.5*dt));
+      const tr=8-3*Math.min(1,spd/sp),mt=(air?1.6:P.onRamp?3:tr)*(keys.manual?.55:1)*dt,ta=Math.max(-mt,Math.min(mt,da)),na=ang+ta;carve=Math.min(1,Math.abs(ta)/(8*dt));
       P.vx=Math.cos(na)*spd;P.vy=Math.sin(na)*spd;
     }
-    if(!air&&spd<sp*.8){
-      P.pushT-=dt;
-      if(P.pushT<=0){P.pushT=.3;P.vx+=ix*sp*.9;P.vy+=iy*sp*.9;P.kick=.34;S.push();}
-    }else if(spd<sp){
-      const a=(sp-spd)*(1-Math.exp(-(air?.3:1.6)*dt)),nx=P.vx/(spd||1),ny=P.vy/(spd||1);
-      P.vx+=nx*a;P.vy+=ny*a;
+    if(!air&&spd<sp){ // smooth acceleration, strongest while kicking off (no more stop-start impulses)
+      const add=Math.min((spd<sp*.8?950:520)*dt,sp-spd),nx=P.vx/spd,ny=P.vy/spd;
+      P.vx+=nx*add;P.vy+=ny*add;
+      if(spd<sp*.8){P.pushT-=dt;if(P.pushT<=0){P.pushT=.3;P.kick=.34;if(spd<40)S.push();}}
+    }else if(air&&spd<sp){
+      const a=(sp-spd)*(1-Math.exp(-.3*dt)),nx=P.vx/spd,ny=P.vy/spd;P.vx+=nx*a;P.vy+=ny*a;
+    }
+    if(!air&&carve>.35&&spd<sp*1.15){ // pumping: tight carves build speed
+      const pa=90*carve*dt,nx=P.vx/spd,ny=P.vy/spd;P.vx+=nx*pa;P.vy+=ny*pa;
     }
   }else if(!air){
     const f=Math.exp(-(P.onRamp?.25:.6)*dt);P.vx*=f;P.vy*=f;if(spd<6)P.vx=P.vy=0;
@@ -892,8 +898,9 @@ function update(dt){
   // keys are screen directions; convert to a ground-plane direction (iso view)
   let wx=0,wy=0;
   let dirMul=1; // the iso view foreshortens up/down and diagonals; speed up the ground-plane speed so every direction feels equally fast on screen
-  if(moving){const[ax,ay]=s2w(ix,iy),l=Math.hypot(ax,ay)||1;wx=ax/l;wy=ay/l;dirMul=Math.min(1.8,l);}
+  if(moving){const[ax,ay]=s2w(ix,iy),l=Math.hypot(ax,ay)||1;wx=ax/l;wy=ay/l;dirMul=Math.min(2.1,l)*(1+.25*Math.abs(iy));}
   skate(dt,wx,wy,sp*dirMul,moving);
+  P.maxSpS=(P.maxSpS||sp)+(sp*dirMul-(P.maxSpS||sp))*(1-Math.exp(-6*dt));P.maxSp=P.maxSpS;
   { // camera leads the direction of travel, zooms out with speed; wheel roar follows speed
     const vsx=(P.vx-P.vy)*IX,vsy=(P.vx+P.vy)*IY,kc=1-Math.exp(-4*dt),spN=P.speedNow||0,top=P.maxSp||300;
     G.camX+=(Math.max(-140,Math.min(140,vsx*.28))-G.camX)*kc;G.camY+=(Math.max(-90,Math.min(90,vsy*.28))-G.camY)*kc;
